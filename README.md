@@ -1,210 +1,357 @@
 # 🦷 Dental AI Tutor
 
-An AI-powered examiner assistant that evaluates dental student case presentations against a reference solution and official marking rubric.
-
-Built entirely on AWS using Amazon Bedrock, AWS Lambda and Amazon S3.
-
-> Designed for UK ORE-style examinations and structured clinical assessments.
+> AI-powered dental examination assessment platform built on AWS that automatically transcribes student presentations, evaluates performance against reference answers and official marking rubrics, generates examiner-style reports, and emails feedback to students.
 
 ---
 
-## 🚀 Features
+# 📚 Table of Contents
 
-- ✅ AI examiner using Claude Sonnet (Amazon Bedrock)
-- ✅ Evaluates student transcripts against a reference answer
-- ✅ Reads multimodal case sheets (images + text)
-- ✅ Uses official marking matrix/rubric
-- ✅ Scores every assessment criterion
-- ✅ Detects confidence, hesitation and filler language
-- ✅ Generates examiner-style feedback
-- ✅ Stores reports back into Amazon S3
-- ✅ Serverless AWS architecture
+- Overview
+- Business Problem
+- Solution Overview
+- End-to-End Architecture
+- Processing Workflow
+- AWS Services
+- Repository Structure
+- S3 Bucket Structure
+- Assessment Pipeline
+- Report Generation
+- Email Delivery
+- Deployment Guide
+- IAM Permissions
+- Monitoring & Observability
+- Security
+- Cost Considerations
+- Future Enhancements
+- Production Architecture
 
 ---
 
-## 🏗️ Solution Architecture
+# 🎯 Overview
+
+Dental AI Tutor is designed to help dental students prepare for ORE-style examinations and clinical assessments.
+
+The platform:
+
+1. Accepts a student MP4 recording.
+2. Automatically transcribes speech using Amazon Transcribe.
+3. Compares the student's performance against:
+   - Case Sheet
+   - Clinical Images
+   - Reference Transcript
+   - Official Marking Matrix
+4. Evaluates clinical reasoning and communication.
+5. Generates examiner-style scoring and feedback.
+6. Stores reports in Amazon S3.
+7. Sends results to students via email using Amazon SNS.
+
+---
+
+# ❓ Business Problem
+
+Manual evaluation of clinical case presentations is:
+
+- Time-consuming
+- Difficult to scale
+- Subject to examiner variation
+- Expensive for training providers
+
+Dental AI Tutor provides:
+
+- Consistent evaluation
+- Immediate feedback
+- Scalable assessments
+- Confidence analysis
+- Standardised marking
+
+---
+
+# 🏗️ End-to-End Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
 
-Student["Student Recording"]
+Student[Student Upload MP4]
 
-Reference["Reference Recording"]
+UploadBucket[(S3 Upload Bucket)]
 
-Case["Case Sheet"]
-Rubric["Marking Matrix"]
+EB1[EventBridge]
 
-S3[(Amazon S3)]
+TranscribeLambda[Lambda #1<br/>Start Transcribe Job]
 
-Lambda["AWS Lambda"]
+Transcribe[Amazon Transcribe]
 
-Claude["Amazon Bedrock<br/>Claude Sonnet"]
+TranscriptBucket[(Transcript JSON)]
 
-Report["Assessment Report"]
+EB2[EventBridge]
 
-Student --> S3
-Reference --> S3
-Case --> S3
-Rubric --> S3
+AssessmentLambda[Lambda #2<br/>Dental Assessment Engine]
 
-S3 --> Lambda
+Bedrock[Amazon Bedrock<br/>Claude Sonnet]
 
-Lambda --> Claude
+ReportBucket[(Reports)]
 
-Claude --> Lambda
+SNS[Amazon SNS]
 
-Lambda --> Report
+Email[Student Email]
 
-Report --> S3
+Student --> UploadBucket
+
+UploadBucket --> EB1
+
+EB1 --> TranscribeLambda
+
+TranscribeLambda --> Transcribe
+
+Transcribe --> TranscriptBucket
+
+TranscriptBucket --> EB2
+
+EB2 --> AssessmentLambda
+
+AssessmentLambda --> Bedrock
+
+Bedrock --> AssessmentLambda
+
+AssessmentLambda --> ReportBucket
+
+AssessmentLambda --> SNS
+
+SNS --> Email
 ```
 
 ---
 
-## 🔄 End-to-End Workflow
+# 🔄 Sequence Diagram
 
 ```mermaid
 sequenceDiagram
 
 participant Student
 participant S3
-participant Lambda
+participant EventBridge
+participant Lambda1
+participant Transcribe
+participant Lambda2
 participant Bedrock
-participant Reports
+participant SNS
 
-Student->>S3: Upload transcript
+Student->>S3: Upload MP4
 
-Lambda->>S3: Read case files
+S3->>EventBridge: Object Created
 
-Lambda->>Bedrock: Evaluate candidate
+EventBridge->>Lambda1: Invoke
 
-Bedrock-->>Lambda: JSON assessment
+Lambda1->>Transcribe: Start Job
 
-Lambda->>Reports: Create report
+Transcribe-->>S3: Transcript JSON
 
-Reports->>S3: Save TXT / DOCX / PDF report
+S3->>EventBridge: Transcript Available
+
+EventBridge->>Lambda2: Invoke
+
+Lambda2->>Bedrock: Evaluate Student
+
+Bedrock-->>Lambda2: Assessment JSON
+
+Lambda2->>S3: Save HTML/JSON Report
+
+Lambda2->>SNS: Publish Notification
+
+SNS-->>Student: Email Report
 ```
 
 ---
 
-## 🧠 AI Evaluation Pipeline
+# 🧠 Assessment Pipeline
 
 ```mermaid
 flowchart LR
 
-A[Case Sheet Image]
-B[Reference Transcript]
-C[Student Transcript]
-D[Marking Matrix]
+CaseSheet[Case Sheet Image]
 
-A --> Prompt
-B --> Prompt
-C --> Prompt
-D --> Prompt
+Rubric[Marking Matrix]
+
+Reference[Reference Transcript]
+
+StudentTranscript[Student Transcript]
+
+Prompt[Examiner Prompt]
+
+Claude[Claude Sonnet]
+
+Assessment[Assessment JSON]
+
+HTML[HTML Report]
+
+CaseSheet --> Prompt
+Rubric --> Prompt
+Reference --> Prompt
+StudentTranscript --> Prompt
 
 Prompt --> Claude
 
-Claude --> JSON
+Claude --> Assessment
 
-JSON --> Report
+Assessment --> HTML
 ```
 
 ---
 
-## ☁️ AWS Architecture
+# ☁️ AWS Services
 
-```mermaid
-flowchart TB
-
-User
-
-S3[(Amazon S3)]
-
-Lambda[AWS Lambda]
-
-Claude[Amazon Bedrock]
-
-Reports[(Assessment Reports)]
-
-User --> S3
-
-S3 --> Lambda
-
-Lambda --> Claude
-
-Claude --> Lambda
-
-Lambda --> Reports
-```
+| Service | Purpose |
+|----------|----------|
+| Amazon S3 | File storage |
+| Amazon EventBridge | Event routing |
+| AWS Lambda | Serverless processing |
+| Amazon Transcribe | Speech-to-text |
+| Amazon Bedrock | AI evaluation |
+| Amazon SNS | Email delivery |
+| Amazon CloudWatch | Logging & monitoring |
+| AWS IAM | Security |
+| AWS KMS | Encryption |
 
 ---
 
-## 📁 Repository Structure
+# 📁 Repository Structure
 
 ```text
 dental-ai-tutor/
 
+├── README.md
+│
+├── docs/
+│   ├── architecture/
+│   ├── diagrams/
+│   └── screenshots/
+│
 ├── lambda/
-│   └── lambda_function.py
+│   ├── transcribe-trigger/
+│   │   └── lambda_function.py
+│   │
+│   └── assessment-engine/
+│       └── lambda_function.py
+│
+├── prompts/
+│   └── examiner-prompt.txt
 │
 ├── cases/
 │   ├── case1/
-│   │   ├── case-study.jpeg
+│   │   ├── case-sheet.jpeg
 │   │   ├── marking-matrix.txt
-│   │   ├── reference-transcript.json
-│   │   └── student1-transcript.json
+│   │   └── reference-transcript.json
 │   │
-│   └── reports/
-│       └── case1/
-│           └── student-outcome-report.txt
+│   └── case2/
 │
-└── README.md
+├── infrastructure/
+│   ├── terraform/
+│   ├── cloudformation/
+│   └── sam/
+│
+└── reports/
 ```
 
 ---
 
-## 📋 Assessment Inputs
+# 🪣 S3 Bucket Structure
 
-For each case the solution consumes:
+```text
+planore-ai-tutor-dev/
 
-### Case Sheet
-
-Contains:
-
-- Clinical scenario
-- Patient details
-- Radiographs/images
-- Examination findings
-- Additional information required for diagnosis
-
-### Marking Matrix
-
-Contains:
-
-- Assessment criteria
-- Scoring framework
-- Pass/fail expectations
-- Examiner guidance
-
-### Reference Transcript
-
-A model answer demonstrating:
-
-- Correct diagnosis
-- Clinical reasoning
-- Patient communication
-- Appropriate treatment planning
-
-### Student Transcript
-
-Generated from:
-
-- Audio recording
-- Manual transcription
-- Amazon Transcribe (future enhancement)
+cases/
+│
+├── case1/
+│   ├── case-study.jpeg
+│   ├── marking-matrix.txt
+│   └── reference-transcript.json
+│
+student-uploads/
+│
+├── case1/
+│   ├── student1.mp4
+│   ├── student2.mp4
+│   └── student3.mp4
+│
+transcripts/
+│
+├── case1/
+│   ├── student1-transcript.json
+│   └── student2-transcript.json
+│
+reports/
+│
+├── case1/
+│   ├── student1-report.html
+│   ├── student1-report.json
+│   └── student1-report.pdf
+```
 
 ---
 
-## 📊 Example Output
+# 📥 Upload Flow
+
+Students upload recordings:
+
+```text
+student-uploads/case1/student1.mp4
+```
+
+Supported formats:
+
+- MP4
+- MP3
+- WAV
+- M4A
+
+---
+
+# 🎤 Transcription Flow
+
+Lambda #1:
+
+Responsibilities:
+
+- Validate upload
+- Create Transcribe Job
+- Track status
+- Save transcript JSON
+
+Output:
+
+```text
+transcripts/case1/student1-transcript.json
+```
+
+---
+
+# 🧾 Assessment Flow
+
+Lambda #2 loads:
+
+- Case Sheet Image
+- Marking Matrix
+- Reference Transcript
+- Student Transcript
+
+The prompt is sent to Claude Sonnet.
+
+Evaluation criteria may include:
+
+- History Taking
+- Diagnosis
+- Differential Diagnosis
+- Treatment Planning
+- Communication Skills
+- Professionalism
+- Empathy
+- Confidence
+- Clinical Safety
+- Time Management
+
+---
+
+# 📊 Example Assessment Output
 
 ```json
 {
@@ -212,293 +359,246 @@ Generated from:
   "overall_grade": "MEETS STANDARD",
   "confidence_score": 55,
   "strengths": [
-    "Correct diagnosis",
-    "Safe clinical management"
+    "Correct diagnosis"
   ],
   "areas_for_improvement": [
-    "Reduce filler language",
-    "Improve confidence"
+    "Reduce filler language"
   ]
 }
 ```
 
 ---
 
-## ⚙️ Deployment
+# 📄 Report Generation
 
-### Prerequisites
+Generated formats:
 
-- AWS Account
-- Amazon Bedrock access
-- Claude Sonnet model enabled
-- Amazon S3 bucket
-- AWS Lambda
+### JSON
 
----
+Machine-readable output
 
-### Step 1 - Create S3 Bucket
+### HTML
 
-```text
-planore-ai-tutor-dev
-```
+Student-friendly assessment report
 
----
+### PDF
 
-### Step 2 - Upload Case Files
+Optional future enhancement
+
+Example location:
 
 ```text
-case1/
-
-├── case-study.jpeg
-├── marking-matrix.txt
-├── reference-transcript.json
-└── student1-transcript.json
+reports/case1/student1-report.html
 ```
 
 ---
 
-### Step 3 - Create Lambda Function
+# 📧 Email Delivery
 
-Runtime:
-
-```text
-Python 3.13
-```
-
-Memory:
+SNS Topic:
 
 ```text
-1024 MB
+dental-ai-assessment-topic
 ```
 
-Timeout:
+Email includes:
 
-```text
-120 Seconds
-```
-
----
-
-### Step 4 - Configure Environment Variables
-
-| Variable | Description |
-|-----------|-------------|
-| BUCKET_NAME | S3 bucket name |
-| MODEL_ID | Bedrock model ID |
-| REGION | AWS Region |
-
-Example:
-
-```text
-BUCKET_NAME=planore-ai-tutor-dev
-MODEL_ID=us.anthropic.claude-sonnet-4-6
-REGION=us-east-1
-```
-
----
-
-### Step 5 - IAM Permissions
-
-Minimum permissions:
-
-```json
-{
-  "Version":"2012-10-17",
-  "Statement":[
-    {
-      "Effect":"Allow",
-      "Action":[
-        "s3:GetObject",
-        "s3:PutObject"
-      ],
-      "Resource":"*"
-    },
-    {
-      "Effect":"Allow",
-      "Action":[
-        "bedrock:InvokeModel"
-      ],
-      "Resource":"*"
-    }
-  ]
-}
-```
-
----
-
-### Step 6 - Test Event
-
-```json
-{
-  "caseId": "case1",
-  "studentId": "student1"
-}
-```
-
----
-
-## 📄 Generated Reports
-
-Reports are written back to S3.
-
-Example:
-
-```text
-cases/reports/case1/student-outcome-report.txt
-```
-
-Report contents include:
-
-- Overall Score
-- Grade
-- Criterion-by-Criterion Scoring
+- Assessment summary
+- Score
+- Confidence score
 - Strengths
-- Areas for Improvement
-- Confidence Assessment
-- Final Examiner Feedback
+- Areas for improvement
+- Link to detailed report
 
 ---
 
-## 🎯 Educational Objectives
+# 🚀 Deployment Steps
 
-The platform helps students:
+## Step 1
 
-- Improve communication skills
-- Improve diagnostic reasoning
-- Improve treatment planning
-- Reduce hesitation and filler language
-- Increase confidence in clinical presentations
-- Prepare for ORE examinations
+Create S3 bucket
 
----
+## Step 2
 
-## 🛣️ Roadmap
+Create EventBridge rule for uploads
 
-### Phase 1 (Current MVP)
+## Step 3
 
-- Case image evaluation
-- Reference transcript comparison
-- Student transcript assessment
-- Examiner-style scoring
-- S3 report generation
+Deploy Transcribe Lambda
 
-### Phase 2
+## Step 4
 
-- Amazon Transcribe integration
-- DOCX report generation
-- PDF report generation
-- Student portal
+Create EventBridge rule for transcript creation
 
-### Phase 3
+## Step 5
 
-- Knowledge Base (RAG)
-- Multi-case management
-- Student dashboard
-- Progress tracking
-- Historical analytics
+Deploy Assessment Lambda
 
-### Phase 4
+## Step 6
 
-- Authentication
-- Multi-tenancy
-- Faculty dashboard
-- Batch assessments
-- Learning recommendations
+Configure Bedrock model access
+
+## Step 7
+
+Create SNS Topic and Email Subscription
+
+## Step 8
+
+Test end-to-end workflow
 
 ---
 
-## 🔮 Future Architecture
+# 🔐 IAM Permissions
+
+## Lambda #1
+
+Required:
+
+- s3:GetObject
+- s3:PutObject
+- transcribe:StartTranscriptionJob
+- transcribe:GetTranscriptionJob
+
+## Lambda #2
+
+Required:
+
+- s3:GetObject
+- s3:PutObject
+- bedrock:InvokeModel
+- sns:Publish
+
+---
+
+# 📈 Monitoring & Observability
+
+CloudWatch Metrics:
+
+- Upload Count
+- Transcription Count
+- Assessment Count
+- Failed Assessments
+- Lambda Duration
+- Bedrock Invocations
+- Email Delivery Count
+
+CloudWatch Alarms:
+
+- Lambda Failures
+- High Error Rate
+- Bedrock Invocation Errors
+- SNS Delivery Failures
+
+---
+
+# 🔒 Security
+
+Recommended controls:
+
+- IAM Least Privilege
+- S3 Encryption
+- KMS Keys
+- CloudWatch Auditing
+- Versioned Buckets
+- Lifecycle Policies
+- Private Buckets
+- HTTPS/TLS Everywhere
+
+---
+
+# 💰 Cost Considerations
+
+Primary cost drivers:
+
+1. Amazon Bedrock
+2. Amazon Transcribe
+3. AWS Lambda
+4. Amazon SNS
+5. Amazon S3
+
+For a pilot deployment with tens of students per day, costs are typically modest and scale with usage.
+
+---
+
+# 🛣️ Roadmap
+
+## Phase 1 (Current)
+
+- MP4 Upload
+- Automatic Transcription
+- AI Assessment
+- HTML Reports
+- Email Delivery
+
+## Phase 2
+
+- PDF Reports
+- Student Portal
+- Faculty Dashboard
+- Progress Tracking
+
+## Phase 3
+
+- Bedrock Knowledge Base
+- RAG Architecture
+- Trend Analysis
+- Learning Recommendations
+
+## Phase 4
+
+- Cognito Authentication
+- Multi-Tenant Platform
+- Institution Administration
+- Analytics Dashboard
+
+---
+
+# 🔮 Production Architecture
 
 ```mermaid
 flowchart TB
 
-Portal
-
 CloudFront
 
-S3
+ReactPortal
 
-API["API Gateway"]
+Cognito
+
+APIGateway
 
 Lambda
 
 Bedrock
 
-Textract
-
 Transcribe
 
 DynamoDB
 
-Portal --> CloudFront
+S3
 
-CloudFront --> API
+SNS
 
-API --> Lambda
+ReactPortal --> CloudFront
 
-Lambda --> S3
+CloudFront --> Cognito
 
-Lambda --> Textract
+CloudFront --> APIGateway
 
-Lambda --> Transcribe
+APIGateway --> Lambda
 
 Lambda --> Bedrock
 
+Lambda --> Transcribe
+
 Lambda --> DynamoDB
+
+Lambda --> S3
+
+Lambda --> SNS
 ```
 
 ---
 
-## 💰 Cost Considerations
+# ⚠️ Disclaimer
 
-Typical MVP costs:
-
-| Service | Estimated Cost |
-|----------|----------------|
-| S3 | Very low |
-| Lambda | Minimal |
-| CloudWatch | Minimal |
-| Bedrock Claude | Pay per request |
-
-Most costs are driven by Bedrock model inference.
-
----
-
-## 🔐 Security
-
-Recommended controls:
-
-- Least-privilege IAM roles
-- S3 encryption
-- HTTPS/TLS everywhere
-- CloudWatch audit logging
-- Secure handling of student data
-- Version-controlled infrastructure
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome.
-
-Potential areas:
-
-- Prompt engineering
-- Report generation
-- UI development
-- Infrastructure as Code
-- Assessment analytics
-
----
-
-## 📜 License
-
-MIT License
-
----
-
-## 👨‍⚕️ Disclaimer
-
-This project is intended for educational assessment and training purposes only.
-
-It is not intended to provide clinical advice, diagnosis or treatment recommendations for real patients.
+This platform is intended for educational assessment and training purposes only and is not intended to provide clinical advice or treatment recommendations.
