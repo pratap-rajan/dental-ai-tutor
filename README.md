@@ -81,7 +81,7 @@ TranscribeLambda[Lambda #1<br/>Start Transcribe Job]
 
 Transcribe[Amazon Transcribe]
 
-TranscriptBucket[(Transcript JSON)]
+TranscriptBucket[(Transcript JSON Bucket)]
 
 EB2[EventBridge]
 
@@ -89,7 +89,7 @@ AssessmentLambda[Lambda #2<br/>Dental Assessment Engine]
 
 Bedrock[Amazon Bedrock<br/>Claude Sonnet]
 
-ReportBucket[(Reports)]
+ReportBucket[(Reports S3 Bucket)]
 
 SNS[Amazon SNS]
 
