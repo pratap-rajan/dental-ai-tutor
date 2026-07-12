@@ -1,91 +1,504 @@
-# dental-ai-tutor
+# 🦷 Dental AI Tutor
 
-# High-Level Architecture Diagram
-This high-level blueprint shows how your file moves seamlessly through your AWS services:
+An AI-powered examiner assistant that evaluates dental student case presentations against a reference solution and official marking rubric.
 
-graph TD
-    A[User uploads student video to S3] --> B(AWS Step Functions Orchestrator)
-    B --> C[1. AWS Transcribe Converts Video to JSON Text]
-    C --> D[2. Lambda Function Evaluates Text against Rubric via Bedrock]
-    D --> E[3. Lambda Saves Styled HTML Report to S3]
-    E --> F[4. Amazon SNS/SES Emails HTML Report Summary to Inbox]
+Built entirely on AWS using Amazon Bedrock, AWS Lambda and Amazon S3.
 
-# LLow-Level Execution Sequence
-When an .mp4 file drops into your bucket, AWS Step Functions coordinates the following tasks behind the scenes:
+> Designed for UK ORE-style examinations and structured clinical assessments.
 
+---
+
+## 🚀 Features
+
+- ✅ AI examiner using Claude Sonnet (Amazon Bedrock)
+- ✅ Evaluates student transcripts against a reference answer
+- ✅ Reads multimodal case sheets (images + text)
+- ✅ Uses official marking matrix/rubric
+- ✅ Scores every assessment criterion
+- ✅ Detects confidence, hesitation and filler language
+- ✅ Generates examiner-style feedback
+- ✅ Stores reports back into Amazon S3
+- ✅ Serverless AWS architecture
+
+---
+
+## 🏗️ Solution Architecture
+
+```mermaid
+flowchart LR
+
+Student["Student Recording"]
+
+Reference["Reference Recording"]
+
+Case["Case Sheet"]
+Rubric["Marking Matrix"]
+
+S3[(Amazon S3)]
+
+Lambda["AWS Lambda"]
+
+Claude["Amazon Bedrock<br/>Claude Sonnet"]
+
+Report["Assessment Report"]
+
+Student --> S3
+Reference --> S3
+Case --> S3
+Rubric --> S3
+
+S3 --> Lambda
+
+Lambda --> Claude
+
+Claude --> Lambda
+
+Lambda --> Report
+
+Report --> S3
+```
+
+---
+
+## 🔄 End-to-End Workflow
+
+```mermaid
 sequenceDiagram
-    autonumber
-    actor User as Examiner (S3 Upload)
-    participant SF as AWS Step Functions
-    participant TR as AWS Transcribe
-    participant S3 as Amazon S3 Bucket
-    participant LM as AWS Lambda (Bedrock)
-    participant SNS as Amazon SNS (Email)
 
-    User->>S3: Uploads case21-highspot-johnsmith.mp4
-    Note over SF: Triggered by EventBridge S3 Upload Event
-    SF->>TR: StartTranscriptionJob
-    TR->>S3: Read .mp4 media file
-    TR->>S3: Write transcribed text to case21-highspot-johnsmith.json
-    TR-->>SF: Job Completed successfully
-    SF->>LM: Invoke Evaluation Lambda (Passes file parameters)
-    LM->>S3: Reads Rubric, Case Images, and newly created Student JSON
-    LM->>LM: Generates custom encouraging HTML layout
-    LM->>S3: Saves case21-highspot-johnsmith-outcome-report.html
-    LM-->>SF: Returns JSON payload (Score, Grade, Feedback)
-    SF->>SNS: Publish Message (Email Alert)
-    SNS-->>User: You receive evaluation results in your inbox
+participant Student
+participant S3
+participant Lambda
+participant Bedrock
+participant Reports
 
-# S3 Bucket Folder Structure:
-Before running an evaluation for a case, you must pre-stage your baseline exam materials using your AWS Management Console.
-Name your student videos using this exact template pattern:
-[CaseID]-[CaseName]-[StudentName].mp4 (e.g., case21-highspot-johnsmith.mp4).
-Here is exactly how your S3 bucket folder directory must look:
+Student->>S3: Upload transcript
 
-your-dental-exam-bucket/
+Lambda->>S3: Read case files
+
+Lambda->>Bedrock: Evaluate candidate
+
+Bedrock-->>Lambda: JSON assessment
+
+Lambda->>Reports: Create report
+
+Reports->>S3: Save TXT / DOCX / PDF report
+```
+
+---
+
+## 🧠 AI Evaluation Pipeline
+
+```mermaid
+flowchart LR
+
+A[Case Sheet Image]
+B[Reference Transcript]
+C[Student Transcript]
+D[Marking Matrix]
+
+A --> Prompt
+B --> Prompt
+C --> Prompt
+D --> Prompt
+
+Prompt --> Claude
+
+Claude --> JSON
+
+JSON --> Report
+```
+
+---
+
+## ☁️ AWS Architecture
+
+```mermaid
+flowchart TB
+
+User
+
+S3[(Amazon S3)]
+
+Lambda[AWS Lambda]
+
+Claude[Amazon Bedrock]
+
+Reports[(Assessment Reports)]
+
+User --> S3
+
+S3 --> Lambda
+
+Lambda --> Claude
+
+Claude --> Lambda
+
+Lambda --> Reports
+```
+
+---
+
+## 📁 Repository Structure
+
+```text
+dental-ai-tutor/
+
+├── lambda/
+│   └── lambda_function.py
 │
 ├── cases/
-│   └── case21/                                 # Folder matches your CaseID prefix
-│       ├── case-study.jpeg                     # PRE-REQUISITE: Clinical case image
-│       ├── case-evaluation-matrix-extracted.txt # PRE-REQUISITE: Explicit rubric definitions
-│       └── ai-tutor-demo.json                  # PRE-REQUISITE: Baseline ideal reference transcript
+│   ├── case1/
+│   │   ├── case-study.jpeg
+│   │   ├── marking-matrix.txt
+│   │   ├── reference-transcript.json
+│   │   └── student1-transcript.json
+│   │
+│   └── reports/
+│       └── case1/
+│           └── student-outcome-report.txt
 │
-├── student-uploads/
-│   └── case21/
-│       # 1. You upload this video file:
-│       ├── case21-highspot-johnsmith.mp4       
-│       #
-│       # 2. AWS Transcribe automatically outputs this text file:
-│       └── case21-highspot-johnsmith.json      
-│
-└── cases/
-    └── reports/
-        └── case21/
-            # 3. Your Lambda creates this beautiful print-ready document:
-            └── case21-highspot-johnsmith-outcome-report.html
+└── README.md
+```
 
-AWS Management Console Setup Guide
-Follow these steps directly inside your AWS Console to hook the entire system together:
+---
 
-1. Set Up Email Notifications (Amazon SNS)
-Search for Simple Notification Service (SNS) in the AWS console header.
-Click Topics on the left menu, click Create Topic, choose Standard, and name it DentalReportTopic. Click Save.
-Open your newly created topic, look under the Subscriptions tab, and click Create Subscription.
-Change the Protocol dropdown selection to Email, and input your personal email address into the Endpoint box.
-Open your email inbox, find the confirmation message sent by AWS, and click Confirm Subscription.
+## 📋 Assessment Inputs
 
-2. Configure Your Lambda Function Environment
-Open your function page in AWS Lambda.
-Go to the Configuration tab, then select Environment variables on the left sub-panel.
+For each case the solution consumes:
 
-Add these parameters:
-BUCKET_NAME = your-dental-exam-bucket
-MODEL_ID = anthropic.claude-3-5-sonnet-20240620-v1:0 (or your chosen Claude runtime variant)
-Ensure your Lambda Execution IAM role includes permissions for s3:GetObject, s3:PutObject, bedrock:InvokeModel, and transcribe:*.
+### Case Sheet
 
-3. Create the Automation Trigger (Amazon EventBridge)
-Navigate to Amazon EventBridge in the console.
-Create a new rule called TriggerExamWorkflowOnUpload.
-Set the rule type to Rule with an event pattern.
-Use an S3 object creation pattern filtering for objects matching prefix student-uploads/ and suffix .mp4.
-Select your Step Functions State Machine as the rule target destination.
+Contains:
+
+- Clinical scenario
+- Patient details
+- Radiographs/images
+- Examination findings
+- Additional information required for diagnosis
+
+### Marking Matrix
+
+Contains:
+
+- Assessment criteria
+- Scoring framework
+- Pass/fail expectations
+- Examiner guidance
+
+### Reference Transcript
+
+A model answer demonstrating:
+
+- Correct diagnosis
+- Clinical reasoning
+- Patient communication
+- Appropriate treatment planning
+
+### Student Transcript
+
+Generated from:
+
+- Audio recording
+- Manual transcription
+- Amazon Transcribe (future enhancement)
+
+---
+
+## 📊 Example Output
+
+```json
+{
+  "overall_score": 68,
+  "overall_grade": "MEETS STANDARD",
+  "confidence_score": 55,
+  "strengths": [
+    "Correct diagnosis",
+    "Safe clinical management"
+  ],
+  "areas_for_improvement": [
+    "Reduce filler language",
+    "Improve confidence"
+  ]
+}
+```
+
+---
+
+## ⚙️ Deployment
+
+### Prerequisites
+
+- AWS Account
+- Amazon Bedrock access
+- Claude Sonnet model enabled
+- Amazon S3 bucket
+- AWS Lambda
+
+---
+
+### Step 1 - Create S3 Bucket
+
+```text
+planore-ai-tutor-dev
+```
+
+---
+
+### Step 2 - Upload Case Files
+
+```text
+case1/
+
+├── case-study.jpeg
+├── marking-matrix.txt
+├── reference-transcript.json
+└── student1-transcript.json
+```
+
+---
+
+### Step 3 - Create Lambda Function
+
+Runtime:
+
+```text
+Python 3.13
+```
+
+Memory:
+
+```text
+1024 MB
+```
+
+Timeout:
+
+```text
+120 Seconds
+```
+
+---
+
+### Step 4 - Configure Environment Variables
+
+| Variable | Description |
+|-----------|-------------|
+| BUCKET_NAME | S3 bucket name |
+| MODEL_ID | Bedrock model ID |
+| REGION | AWS Region |
+
+Example:
+
+```text
+BUCKET_NAME=planore-ai-tutor-dev
+MODEL_ID=us.anthropic.claude-sonnet-4-6
+REGION=us-east-1
+```
+
+---
+
+### Step 5 - IAM Permissions
+
+Minimum permissions:
+
+```json
+{
+  "Version":"2012-10-17",
+  "Statement":[
+    {
+      "Effect":"Allow",
+      "Action":[
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource":"*"
+    },
+    {
+      "Effect":"Allow",
+      "Action":[
+        "bedrock:InvokeModel"
+      ],
+      "Resource":"*"
+    }
+  ]
+}
+```
+
+---
+
+### Step 6 - Test Event
+
+```json
+{
+  "caseId": "case1",
+  "studentId": "student1"
+}
+```
+
+---
+
+## 📄 Generated Reports
+
+Reports are written back to S3.
+
+Example:
+
+```text
+cases/reports/case1/student-outcome-report.txt
+```
+
+Report contents include:
+
+- Overall Score
+- Grade
+- Criterion-by-Criterion Scoring
+- Strengths
+- Areas for Improvement
+- Confidence Assessment
+- Final Examiner Feedback
+
+---
+
+## 🎯 Educational Objectives
+
+The platform helps students:
+
+- Improve communication skills
+- Improve diagnostic reasoning
+- Improve treatment planning
+- Reduce hesitation and filler language
+- Increase confidence in clinical presentations
+- Prepare for ORE examinations
+
+---
+
+## 🛣️ Roadmap
+
+### Phase 1 (Current MVP)
+
+- Case image evaluation
+- Reference transcript comparison
+- Student transcript assessment
+- Examiner-style scoring
+- S3 report generation
+
+### Phase 2
+
+- Amazon Transcribe integration
+- DOCX report generation
+- PDF report generation
+- Student portal
+
+### Phase 3
+
+- Knowledge Base (RAG)
+- Multi-case management
+- Student dashboard
+- Progress tracking
+- Historical analytics
+
+### Phase 4
+
+- Authentication
+- Multi-tenancy
+- Faculty dashboard
+- Batch assessments
+- Learning recommendations
+
+---
+
+## 🔮 Future Architecture
+
+```mermaid
+flowchart TB
+
+Portal
+
+CloudFront
+
+S3
+
+API["API Gateway"]
+
+Lambda
+
+Bedrock
+
+Textract
+
+Transcribe
+
+DynamoDB
+
+Portal --> CloudFront
+
+CloudFront --> API
+
+API --> Lambda
+
+Lambda --> S3
+
+Lambda --> Textract
+
+Lambda --> Transcribe
+
+Lambda --> Bedrock
+
+Lambda --> DynamoDB
+```
+
+---
+
+## 💰 Cost Considerations
+
+Typical MVP costs:
+
+| Service | Estimated Cost |
+|----------|----------------|
+| S3 | Very low |
+| Lambda | Minimal |
+| CloudWatch | Minimal |
+| Bedrock Claude | Pay per request |
+
+Most costs are driven by Bedrock model inference.
+
+---
+
+## 🔐 Security
+
+Recommended controls:
+
+- Least-privilege IAM roles
+- S3 encryption
+- HTTPS/TLS everywhere
+- CloudWatch audit logging
+- Secure handling of student data
+- Version-controlled infrastructure
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome.
+
+Potential areas:
+
+- Prompt engineering
+- Report generation
+- UI development
+- Infrastructure as Code
+- Assessment analytics
+
+---
+
+## 📜 License
+
+MIT License
+
+---
+
+## 👨‍⚕️ Disclaimer
+
+This project is intended for educational assessment and training purposes only.
+
+It is not intended to provide clinical advice, diagnosis or treatment recommendations for real patients.
