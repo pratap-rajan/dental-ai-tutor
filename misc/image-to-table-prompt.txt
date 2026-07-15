@@ -1,0 +1,1 @@
+Extract all text exactly as written. Preserve headings, sections, tables and scoring criteria. Return markdown. produce a text file
