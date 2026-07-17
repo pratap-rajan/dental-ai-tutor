@@ -343,7 +343,7 @@ def lambda_handler(event, context):
         case_image_key    = f"cases/{case_id}/case-study.jpeg"
         marking_key       = f"cases/{case_id}/case-evaluation-matrix-extracted.txt"
         reference_key     = f"cases/{case_id}/reference-knowledge.json"
-        prompt_key        = f"cases/{case_id}/prompt-template.txt"
+        prompt_key        = f"cases/{case_id}/prompt-text.txt"
 
         print(f"Loading case resources for {case_id}")
 
