@@ -226,6 +226,12 @@ SCORING PHILOSOPHY (ENCOURAGING & CONSTRUCTIVE):
 - Construct your feedback to be supportive: praise their strengths first, and frame omissions as "actionable tips for excellence" rather than failures.
 - Do not invent criteria.
 
+IMPORTANT — PATIENT NAME & GENDER IDENTIFICATION:
+- Do NOT assess, flag, penalise, or comment on whether the student correctly identified the patient's name, title, or gender.
+- Any mismatch between how the student referred to the patient and the case sheet details must be completely ignored.
+- Do not mention patient name or gender identification anywhere in the JSON output — not in criteria feedback, strengths, areas for improvement, confidence assessment, or final feedback.
+- Refer to the candidate throughout all feedback fields as "the Student" — never use any personal name.
+
 CRITICAL INSTRUCTION FOR OUTPUT STYLE:
 You must structure your JSON evaluation to match the exhaustive granularity, deep actionable feedback style, and precision found in the target sample reference block below. Ensure specific quotes or clinical omissions are isolated cleanly.
 
@@ -238,31 +244,31 @@ You must structure your JSON evaluation to match the exhaustive granularity, dee
       "name": "Deriving patient information",
       "score": 3,
       "max_score": 4,
-      "feedback": "Student confirmed name and DOB, asked about pain onset, radiation, aggravating factors (biting/chewing), swelling, and pus discharge. However, missed asking about bite height specifically ('do you feel a high bite?'), did not ask about sleep disturbance, and did not ask about medical history until prompted by the asthma mention later. The history was reasonable but not fully systematic per the marking matrix."
+      "feedback": "The Student confirmed name and DOB, asked about pain onset, radiation, aggravating factors (biting/chewing), swelling, and pus discharge. However, missed asking about bite height specifically ('do you feel a high bite?'), did not ask about sleep disturbance, and did not ask about medical history until prompted by the asthma mention later. The history was reasonable but not fully systematic per the marking matrix."
     }},
     {{
       "name": "Empathy",
       "score": 3,
       "max_score": 4,
-      "feedback": "Student expressed empathy multiple times ('I'm so sorry to hear that') and acknowledged the patient's frustration. However, the empathy felt slightly formulaic and repetitive rather than genuinely tailored. The student did not explicitly validate the patient's annoyance at the previous dentist or reassure them confidently that they would be helped."
+      "feedback": "The Student expressed empathy multiple times ('I'm so sorry to hear that') and acknowledged the patient's frustration. However, the empathy felt slightly formulaic and repetitive rather than genuinely tailored. The Student did not explicitly validate the patient's annoyance at the previous dentist or reassure them confidently that they would be helped."
     }},
     {{
       "name": "Communication and interaction",
       "score": 3,
       "max_score": 4,
-      "feedback": "Student used a drawing/visual aid to explain the high spot, which is commendable. Explanation of the high spot mechanism was clear and patient-friendly. Addressed the colleague's competence question appropriately. However, there was notable filler language ('uh', 'um'), some hesitation, and the student incorrectly identified the patient as 'Mr. John/Jones' (case states Mrs. Mariya, a female patient) — a significant professionalism concern. The student also asked for consent to ask questions, which is slightly unnecessary and disrupts flow."
+      "feedback": "The Student used a drawing/visual aid to explain the high spot, which is commendable. Explanation of the high spot mechanism was clear and patient-friendly. Addressed the colleague's competence question appropriately. However, there was notable filler language ('uh', 'um'), some hesitation, and the Student asked for consent to ask questions, which is slightly unnecessary and disrupts flow."
     }},
     {{
       "name": "Time management: 5 minutes",
       "score": 3,
       "max_score": 4,
-      "feedback": "The student covered most key areas within the time frame: history, diagnosis, explanation, treatment, and review. The consultation appeared to be completed within a reasonable timeframe. However, some time was spent on less critical elements (e.g., asking consent to ask questions) which slightly reduced efficiency."
+      "feedback": "The Student covered most key areas within the time frame: history, diagnosis, explanation, treatment, and review. The consultation appeared to be completed within a reasonable timeframe. However, some time was spent on less critical elements (e.g., asking consent to ask questions) which slightly reduced efficiency."
     }},
     {{
       "name": "Clinical management",
       "score": 4,
       "max_score": 4,
-      "feedback": "Excellent clinical management: correctly identified high spot diagnosis, explained articulating paper use, grinding down the excess, advised soft diet, prescribed appropriate painkillers (paracetamol given asthma — correctly avoided NSAIDs/aspirin/ibuprofen), and arranged a 2-week review. The asthma-aware prescribing was a standout clinical point not present in the reference answer."
+      "feedback": "Excellent clinical management: the Student correctly identified the high spot diagnosis, explained articulating paper use, grinding down the excess, advised soft diet, prescribed appropriate painkillers (paracetamol given asthma — correctly avoided NSAIDs/aspirin/ibuprofen), and arranged a 2-week review. The asthma-aware prescribing was a standout clinical point not present in the reference answer."
     }}
   ],
   "strengths": [
@@ -273,7 +279,6 @@ You must structure your JSON evaluation to match the exhaustive granularity, dee
     "Explained why shallow cavities predispose to overfilling — directly answering the patient's specific question"
   ],
   "areas_for_improvement": [
-    "Critical error: misidentified patient gender and name (called 'Mr. John/Jones' — patient is Mrs. Mariya, a 45-year-old female). This is a significant professionalism and patient safety concern in a real clinical setting",
     "Excessive filler language ('uh', 'um') throughout — reduces professional confidence and clarity",
     "Did not specifically ask about high bite sensation, which is the key diagnostic question for this case",
     "Medical history should be taken earlier in the consultation, not discovered incidentally at the end",
@@ -281,9 +286,9 @@ You must structure your JSON evaluation to match the exhaustive granularity, dee
   ],
   "confidence_assessment": {{
     "score": 65,
-    "feedback": "The student demonstrated moderate confidence in clinical knowledge (correct diagnosis, treatment plan, prescribing awareness) but showed significant uncertainty in communication style. Frequent use of 'uh', 'um', hedging language ('that's might what have happened'), and tentative phrasing ('I think what you have got is...') undermined clinical authority. The misidentification of the patient's name and gender further suggests lack of preparation and situational awareness. The student recovered well when challenged about the colleague's work but overall confidence was inconsistent — strong in clinical content, weak in delivery."
+    "feedback": "The Student demonstrated moderate confidence in clinical knowledge (correct diagnosis, treatment plan, prescribing awareness) but showed significant uncertainty in communication style. Frequent use of 'uh', 'um', hedging language ('that's might what have happened'), and tentative phrasing ('I think what you have got is...') undermined clinical authority. The Student recovered well when challenged about the colleague's work but overall confidence was inconsistent — strong in clinical content, weak in delivery."
   }},
-  "final_feedback": "Mrs. Barkavi demonstrated a solid understanding of the clinical scenario and produced an accurate diagnosis and appropriate management plan, including a commendable asthma-aware prescribing decision. The explanation of the high spot mechanism was clear and well-structured. However, the consultation was significantly undermined by the misidentification of the patient as 'Mr. John' when the case clearly states 'Mrs. Mariya' — this is a fundamental error in patient identification that would be flagged seriously in a real ORE examination. Communication was further weakened by excessive filler language and hesitant phrasing. To reach Above Standard, the student should: (1) always verify patient details against the case sheet, (2) take a complete and systematic history including the specific 'high bite' question early, (3) take medical history before treatment planning, and (4) work on confident, fluent delivery to match the strong clinical knowledge demonstrated."
+  "final_feedback": "The Student demonstrated a solid understanding of the clinical scenario and produced an accurate diagnosis and appropriate management plan, including a commendable asthma-aware prescribing decision. The explanation of the high spot mechanism was clear and well-structured. Communication was weakened by excessive filler language and hesitant phrasing. To reach Above Standard, the Student should: (1) take a complete and systematic history including the specific 'high bite' question early, (2) take medical history before treatment planning, and (3) work on confident, fluent delivery to match the strong clinical knowledge demonstrated."
 }}
 --- END TARGET SAMPLE FORMAT REFERENCE ---
 
@@ -517,4 +522,3 @@ def lambda_handler(event, context):
                 "error": str(ex)
             }
         }
-
