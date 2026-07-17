@@ -1,4 +1,4 @@
 {
-  "reference_key": "case1/ai-tutor-demo.json",
-  "student_key": "student-uploads/case1/ai-tutor-demo-case1.json"
+  "caseId": "case1-amalgam-highspot",
+  "student_json_key": "transcripts/case1-amalgam-highspot/student1.json"
 }
