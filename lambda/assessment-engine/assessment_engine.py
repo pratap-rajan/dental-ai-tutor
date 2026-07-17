@@ -1,3 +1,4 @@
+import json
 import os
 import base64
 import boto3
@@ -9,8 +10,14 @@ bedrock = boto3.client(
     region_name=os.environ.get("REGION", "eu-west-2")
 )
 
+ses = boto3.client(
+    "ses",
+    region_name=os.environ.get("REGION", "eu-west-2")
+)
+
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 MODEL_ID = os.environ["MODEL_ID"]
+REPORT_SENDER = os.environ.get("SES_SENDER", "academy@planore.co.uk")
 
 
 def read_s3_text(bucket, key):
@@ -335,6 +342,47 @@ def invoke_claude_with_image(image_base64, prompt):
     return response_body["content"][0]["text"]
 
 
+def send_report_email(case_id, file_prefix, html_content, recipient):
+    """Sends the HTML assessment report as an email attachment via AWS SES using raw MIME."""
+    import email.mime.multipart
+    import email.mime.text
+    import email.mime.base
+    import email.encoders
+
+    subject = case_id
+
+    msg = email.mime.multipart.MIMEMultipart("mixed")
+    msg["Subject"] = subject
+    msg["From"]    = REPORT_SENDER
+    msg["To"]      = recipient
+
+    # Plain-text body
+    body = email.mime.text.MIMEText(
+        f"Please find attached the ORE assessment report for {file_prefix}.",
+        "plain"
+    )
+    msg.attach(body)
+
+    # HTML report as attachment
+    attachment = email.mime.base.MIMEBase("text", "html")
+    attachment.set_payload(html_content.encode("utf-8"))
+    email.encoders.encode_base64(attachment)
+    attachment.add_header(
+        "Content-Disposition",
+        "attachment",
+        filename=f"{file_prefix}-report.html"
+    )
+    msg.attach(attachment)
+
+    ses.send_raw_email(
+        Source=REPORT_SENDER,
+        Destinations=[recipient],
+        RawMessage={"Data": msg.as_string()}
+    )
+
+    print(f"Report email sent to {recipient} for {file_prefix}")
+
+
 def lambda_handler(event, context):
 
     print("EVENT =", json.dumps(event))
@@ -345,7 +393,8 @@ def lambda_handler(event, context):
     # {
     #   "caseId": "case1-amalgam-highspot",
     #   "student_json_key":
-    #      "transcripts/case1-amalgam-highspot/student1.json"
+    #      "transcripts/case1-amalgam-highspot/student1.json",
+    #   "emailId": "academy@planore.co.uk"
     # }
     #
 
@@ -358,9 +407,18 @@ def lambda_handler(event, context):
         "student_json_key"
     )
 
+    email_id = event.get(
+        "emailId"
+    )
+
     if not student_json_key:
         raise Exception(
             "student_json_key missing from event"
+        )
+
+    if not email_id:
+        raise Exception(
+            "emailId missing from event"
         )
 
     file_prefix = (
@@ -495,6 +553,17 @@ def lambda_handler(event, context):
             html_report
         )
 
+        #
+        # Send email report
+        #
+
+        send_report_email(
+            case_id,
+            file_prefix,
+            html_report,
+            email_id
+        )
+
         return {
             "statusCode": 200,
             "body": {
@@ -505,7 +574,9 @@ def lambda_handler(event, context):
                 "student":
                     file_prefix,
                 "report_s3_key":
-                    report_key
+                    report_key,
+                "email_sent_to":
+                    email_id
             }
         }
 
