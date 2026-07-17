@@ -16,30 +16,30 @@ ses = boto3.client(
 )
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
-MODEL_ID = os.environ["MODEL_ID"]
+MODEL_ID    = os.environ["MODEL_ID"]
 REPORT_SENDER = os.environ.get("SES_SENDER", "academy@planore.co.uk")
 
 
 def read_s3_text(bucket, key):
-    """Reads a plain text file from an S3 bucket and decodes it."""
+    """Reads a plain text file from S3 and decodes it."""
     response = s3.get_object(Bucket=bucket, Key=key)
     return response["Body"].read().decode("utf-8")
 
 
 def read_s3_image_base64(bucket, key):
-    """Reads an image from S3 and returns its base64 encoded string."""
+    """Reads an image from S3 and returns it as a base64 string."""
     response = s3.get_object(Bucket=bucket, Key=key)
-    image_bytes = response["Body"].read()
-    return base64.b64encode(image_bytes).decode("utf-8")
+    return base64.b64encode(response["Body"].read()).decode("utf-8")
+
 
 def extract_transcript(transcribe_json_text):
-    """Extracts the raw transcript text from an Amazon Transcribe JSON structure."""
+    """Extracts the raw transcript from an Amazon Transcribe JSON structure."""
     data = json.loads(transcribe_json_text)
     return data["results"]["transcripts"][0]["transcript"]
 
 
 def clean_json_response(text):
-    """Cleans up the LLM response by stripping out markdown code blocks."""
+    """Strips markdown code fences from the LLM response."""
     text = text.strip()
     if text.startswith("```json"):
         text = text[7:]
@@ -50,18 +50,57 @@ def clean_json_response(text):
     return text.strip()
 
 
-def write_s3_html(bucket, key, html_content):
-    """Writes a styled HTML document directly to an S3 object with the correct content type."""
-    s3.put_object(
-        Bucket=bucket,
-        Key=key,
-        Body=html_content.encode("utf-8"),
-        ContentType="text/html"
+def build_prompt(prompt_template, marking_matrix, reference_answer, student_answer):
+    """
+    Fills the prompt template loaded from S3 with the three dynamic values.
+    The template must contain exactly these placeholders:
+        {marking_matrix}
+        {reference_answer}
+        {student_answer}
+    """
+    return prompt_template.format(
+        marking_matrix=marking_matrix,
+        reference_answer=reference_answer,
+        student_answer=student_answer
     )
 
 
+def invoke_claude_with_image(image_base64, prompt):
+    """Invokes the Claude model via Bedrock with an image and text prompt."""
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 4000,
+        "temperature": 0.1,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": image_base64
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+    response = bedrock.invoke_model(
+        modelId=MODEL_ID,
+        body=json.dumps(body)
+    )
+    response_body = json.loads(response["body"].read())
+    return response_body["content"][0]["text"]
+
+
 def generate_html_report(assessment, report_key):
-    """Constructs a responsive, print-ready HTML layout populated with assessment data."""
+    """Constructs a responsive, print-ready HTML report from the assessment JSON."""
     table_rows = ""
     for criterion in assessment.get("criteria", []):
         table_rows += f"""
@@ -72,8 +111,10 @@ def generate_html_report(assessment, report_key):
         </div>
         """
 
-    strengths_list = "".join([f'<li class="strength-item">{s}</li>' for s in assessment.get("strengths", [])])
-    
+    strengths_list = "".join(
+        [f'<li class="strength-item">{s}</li>' for s in assessment.get("strengths", [])]
+    )
+
     improvements_list = ""
     for imp in assessment.get("areas_for_improvement", []):
         if "critical error" in imp.lower():
@@ -213,157 +254,35 @@ def generate_html_report(assessment, report_key):
 </html>
 """
 
-def build_prompt(marking_matrix, reference_answer, student_answer):
-    """Constructs the prompt for the Claude model, tuned to provide encouraging, constructive scoring."""
-    return f"""
-You are an experienced UK dental examiner assessing a student in an ORE-style examination.
-The attached image contains the complete case sheet and clinical imagery.
-Use the marking matrix exactly.
 
-Compare the student's performance against:
-1. Case sheet image
-2. Marking matrix
-3. Reference answer
-4. Student answer
-
-SCORING PHILOSOPHY (ENCOURAGING & CONSTRUCTIVE):
-- Be lenient and encouraging in your scoring. Focus on rewarding what the student did right rather than strictly penalizing minor omissions.
-- If the student demonstrates safe clinical judgment and hits the core diagnosis, award them a strong baseline score (e.g., meeting standards).
-- Construct your feedback to be supportive: praise their strengths first, and frame omissions as "actionable tips for excellence" rather than failures.
-- Do not invent criteria.
-
-IMPORTANT — PATIENT NAME & GENDER IDENTIFICATION:
-- Do NOT assess, flag, penalise, or comment on whether the student correctly identified the patient's name, title, or gender.
-- Any mismatch between how the student referred to the patient and the case sheet details must be completely ignored.
-- Do not mention patient name or gender identification anywhere in the JSON output — not in criteria feedback, strengths, areas for improvement, confidence assessment, or final feedback.
-- Refer to the candidate throughout all feedback fields as "the Student" — never use any personal name.
-
-CRITICAL INSTRUCTION FOR OUTPUT STYLE:
-You must structure your JSON evaluation to match the exhaustive granularity, deep actionable feedback style, and precision found in the target sample reference block below. Ensure specific quotes or clinical omissions are isolated cleanly.
-
---- BEGIN TARGET SAMPLE FORMAT REFERENCE ---
-{{
-  "overall_score": 72,
-  "overall_grade": "MEETS STANDARD",
-  "criteria": [
-    {{
-      "name": "Deriving patient information",
-      "score": 3,
-      "max_score": 4,
-      "feedback": "The Student confirmed name and DOB, asked about pain onset, radiation, aggravating factors (biting/chewing), swelling, and pus discharge. However, missed asking about bite height specifically ('do you feel a high bite?'), did not ask about sleep disturbance, and did not ask about medical history until prompted by the asthma mention later. The history was reasonable but not fully systematic per the marking matrix."
-    }},
-    {{
-      "name": "Empathy",
-      "score": 3,
-      "max_score": 4,
-      "feedback": "The Student expressed empathy multiple times ('I'm so sorry to hear that') and acknowledged the patient's frustration. However, the empathy felt slightly formulaic and repetitive rather than genuinely tailored. The Student did not explicitly validate the patient's annoyance at the previous dentist or reassure them confidently that they would be helped."
-    }},
-    {{
-      "name": "Communication and interaction",
-      "score": 3,
-      "max_score": 4,
-      "feedback": "The Student used a drawing/visual aid to explain the high spot, which is commendable. Explanation of the high spot mechanism was clear and patient-friendly. Addressed the colleague's competence question appropriately. However, there was notable filler language ('uh', 'um'), some hesitation, and the Student asked for consent to ask questions, which is slightly unnecessary and disrupts flow."
-    }},
-    {{
-      "name": "Time management: 5 minutes",
-      "score": 3,
-      "max_score": 4,
-      "feedback": "The Student covered most key areas within the time frame: history, diagnosis, explanation, treatment, and review. The consultation appeared to be completed within a reasonable timeframe. However, some time was spent on less critical elements (e.g., asking consent to ask questions) which slightly reduced efficiency."
-    }},
-    {{
-      "name": "Clinical management",
-      "score": 4,
-      "max_score": 4,
-      "feedback": "Excellent clinical management: the Student correctly identified the high spot diagnosis, explained articulating paper use, grinding down the excess, advised soft diet, prescribed appropriate painkillers (paracetamol given asthma — correctly avoided NSAIDs/aspirin/ibuprofen), and arranged a 2-week review. The asthma-aware prescribing was a standout clinical point not present in the reference answer."
-    }}
-  ],
-  "strengths": [
-    "Correct diagnosis of high spot and clear patient-friendly explanation with visual aid",
-    "Excellent clinical awareness — correctly avoided NSAIDs due to asthma and prescribed paracetamol instead",
-    "Appropriate treatment plan: articulating paper, grinding, soft diet, painkillers, 2-week review",
-    "Addressed the patient's concern about the previous dentist's competence appropriately",
-    "Explained why shallow cavities predispose to overfilling — directly answering the patient's specific question"
-  ],
-  "areas_for_improvement": [
-    "Excessive filler language ('uh', 'um') throughout — reduces professional confidence and clarity",
-    "Did not specifically ask about high bite sensation, which is the key diagnostic question for this case",
-    "Medical history should be taken earlier in the consultation, not discovered incidentally at the end",
-    "Empathy could be more personalised and less repetitive; should more explicitly reassure the patient that the pain will resolve"
-  ],
-  "confidence_assessment": {{
-    "score": 65,
-    "feedback": "The Student demonstrated moderate confidence in clinical knowledge (correct diagnosis, treatment plan, prescribing awareness) but showed significant uncertainty in communication style. Frequent use of 'uh', 'um', hedging language ('that's might what have happened'), and tentative phrasing ('I think what you have got is...') undermined clinical authority. The Student recovered well when challenged about the colleague's work but overall confidence was inconsistent — strong in clinical content, weak in delivery."
-  }},
-  "final_feedback": "The Student demonstrated a solid understanding of the clinical scenario and produced an accurate diagnosis and appropriate management plan, including a commendable asthma-aware prescribing decision. The explanation of the high spot mechanism was clear and well-structured. Communication was weakened by excessive filler language and hesitant phrasing. To reach Above Standard, the Student should: (1) take a complete and systematic history including the specific 'high bite' question early, (2) take medical history before treatment planning, and (3) work on confident, fluent delivery to match the strong clinical knowledge demonstrated."
-}}
---- END TARGET SAMPLE FORMAT REFERENCE ---
-
-MARKING MATRIX
-{marking_matrix}
-
-REFERENCE ANSWER
-{reference_answer}
-
-STUDENT ANSWER
-{student_answer}
-
-Return ONLY valid JSON matching the exact schema keys of the reference sample above.
-"""
-
-def invoke_claude_with_image(image_base64, prompt):
-    """Invokes the Claude model via Bedrock with an image and text prompt."""
-    body = {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 4000,
-        "temperature": 0.1,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": image_base64
-                        }
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
-    }
-
-    response = bedrock.invoke_model(modelId=MODEL_ID, body=json.dumps(body))
-    response_body = json.loads(response["body"].read())
-    return response_body["content"][0]["text"]
+def write_s3_html(bucket, key, html_content):
+    """Writes the HTML report to S3 with the correct content type."""
+    s3.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=html_content.encode("utf-8"),
+        ContentType="text/html"
+    )
 
 
 def send_report_email(case_id, file_prefix, html_content, recipient):
-    """Sends the HTML assessment report as an email attachment via AWS SES using raw MIME."""
+    """Sends the HTML assessment report as an email attachment via AWS SES."""
     import email.mime.multipart
     import email.mime.text
     import email.mime.base
     import email.encoders
 
-    subject = case_id
-
     msg = email.mime.multipart.MIMEMultipart("mixed")
-    msg["Subject"] = subject
+    msg["Subject"] = case_id
     msg["From"]    = REPORT_SENDER
     msg["To"]      = recipient
 
-    # Plain-text body
     body = email.mime.text.MIMEText(
         f"Please find attached the ORE assessment report for {file_prefix}.",
         "plain"
     )
     msg.attach(body)
 
-    # HTML report as attachment
     attachment = email.mime.base.MIMEBase("text", "html")
     attachment.set_payload(html_content.encode("utf-8"))
     email.encoders.encode_base64(attachment)
@@ -391,35 +310,21 @@ def lambda_handler(event, context):
     # Expected event:
     #
     # {
-    #   "caseId": "case1-amalgam-highspot",
-    #   "student_json_key":
-    #      "transcripts/case1-amalgam-highspot/student1.json",
-    #   "emailId": "academy@planore.co.uk"
+    #   "caseId":           "case1-amalgam-highspot",
+    #   "student_json_key": "transcripts/case1-amalgam-highspot/student1.json",
+    #   "emailId":          "academy@planore.co.uk"
     # }
     #
 
-    case_id = event.get(
-        "caseId",
-        "case1-amalgam-highspot"
-    )
-
-    student_json_key = event.get(
-        "student_json_key"
-    )
-
-    email_id = event.get(
-        "emailId"
-    )
+    case_id          = event.get("caseId", "case1-amalgam-highspot")
+    student_json_key = event.get("student_json_key")
+    email_id         = event.get("emailId")
 
     if not student_json_key:
-        raise Exception(
-            "student_json_key missing from event"
-        )
+        raise Exception("student_json_key missing from event")
 
     if not email_id:
-        raise Exception(
-            "emailId missing from event"
-        )
+        raise Exception("emailId missing from event")
 
     file_prefix = (
         student_json_key
@@ -427,77 +332,44 @@ def lambda_handler(event, context):
         .replace(".json", "")
     )
 
-    print(
-        f"Processing case={case_id} "
-        f"student={file_prefix}"
-    )
+    print(f"Processing case={case_id} student={file_prefix}")
 
     try:
 
         #
-        # Reference files
+        # S3 keys — all case-specific files live under cases/{caseId}/
         #
 
-        case_image_key = (
-            f"cases/{case_id}/case-study.jpeg"
-        )
+        case_image_key    = f"cases/{case_id}/case-study.jpeg"
+        marking_key       = f"cases/{case_id}/case-evaluation-matrix-extracted.txt"
+        reference_key     = f"cases/{case_id}/reference-knowledge.json"
+        prompt_key        = f"cases/{case_id}/prompt-template.txt"
 
-        marking_key = (
-            f"cases/{case_id}/"
-            f"case-evaluation-matrix-extracted.txt"
-        )
-
-        reference_key = (
-            f"cases/{case_id}/"
-            f"reference-knowledge.json"
-        )
-
-        print(
-            f"Loading case resources "
-            f"for {case_id}"
-        )
+        print(f"Loading case resources for {case_id}")
 
         #
-        # Read S3
+        # Read all S3 inputs
         #
 
-        case_image_base64 = read_s3_image_base64(
-            BUCKET_NAME,
-            case_image_key
-        )
-
-        marking_matrix = read_s3_text(
-            BUCKET_NAME,
-            marking_key
-        )
-
-        reference_json = read_s3_text(
-            BUCKET_NAME,
-            reference_key
-        )
-
-        student_json = read_s3_text(
-            BUCKET_NAME,
-            student_json_key
-        )
+        case_image_base64 = read_s3_image_base64(BUCKET_NAME, case_image_key)
+        marking_matrix    = read_s3_text(BUCKET_NAME, marking_key)
+        reference_json    = read_s3_text(BUCKET_NAME, reference_key)
+        student_json      = read_s3_text(BUCKET_NAME, student_json_key)
+        prompt_template   = read_s3_text(BUCKET_NAME, prompt_key)
 
         #
         # Extract transcripts
         #
 
-        reference_answer = extract_transcript(
-            reference_json
-        )
-
-        student_answer = extract_transcript(
-            student_json
-        )
+        reference_answer = extract_transcript(reference_json)
+        student_answer   = extract_transcript(student_json)
 
         #
-        # Build prompt
+        # Build prompt from S3 template
         #
 
         prompt = build_prompt(
+            prompt_template,
             marking_matrix,
             reference_answer,
             student_answer
@@ -512,79 +384,42 @@ def lambda_handler(event, context):
             prompt
         )
 
-        cleaned_result = clean_json_response(
-            result_text
-        )
-
         assessment = json.loads(
-            cleaned_result
+            clean_json_response(result_text)
         )
 
         #
-        # Report location
+        # Generate and upload HTML report
         #
 
-        report_key = (
-            f"reports/{case_id}/"
-            f"{file_prefix}-report.html"
-        )
+        report_key = f"reports/{case_id}/{file_prefix}-report.html"
+
+        html_report = generate_html_report(assessment, report_key)
+
+        print(f"Uploading report to {report_key}")
+
+        write_s3_html(BUCKET_NAME, report_key, html_report)
 
         #
-        # Generate HTML
+        # Send email
         #
 
-        html_report = generate_html_report(
-            assessment,
-            report_key
-        )
-
-        #
-        # Upload report
-        #
-
-        print(
-            f"Uploading report "
-            f"to {report_key}"
-        )
-
-        write_s3_html(
-            BUCKET_NAME,
-            report_key,
-            html_report
-        )
-
-        #
-        # Send email report
-        #
-
-        send_report_email(
-            case_id,
-            file_prefix,
-            html_report,
-            email_id
-        )
+        send_report_email(case_id, file_prefix, html_report, email_id)
 
         return {
             "statusCode": 200,
             "body": {
-                "message":
-                    "Assessment completed",
-                "caseId":
-                    case_id,
-                "student":
-                    file_prefix,
-                "report_s3_key":
-                    report_key,
-                "email_sent_to":
-                    email_id
+                "message":       "Assessment completed",
+                "caseId":        case_id,
+                "student":       file_prefix,
+                "report_s3_key": report_key,
+                "email_sent_to": email_id
             }
         }
 
     except Exception as ex:
 
-        print(
-            f"ERROR: {str(ex)}"
-        )
+        print(f"ERROR: {str(ex)}")
 
         return {
             "statusCode": 500,
