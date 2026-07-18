@@ -1,0 +1,230 @@
+# Architecture — Current Implementation
+
+This document describes the **as-built** architecture of the Dental AI Tutor assessment pipeline, as deployed in the `planore-ai-tutor` AWS account. It supplements the main [README](./README.md), which describes the target end-to-end vision (upload → auto-transcribe → auto-assess → SNS email). The current implementation covers the **assessment stage** of that pipeline, triggered explicitly rather than via automatic EventBridge chaining from upload.
+
+---
+
+## Table of Contents
+
+- [Current vs Target Architecture](#current-vs-target-architecture)
+- [Component Overview](#component-overview)
+- [Trigger Flow](#trigger-flow)
+- [S3 Bucket Structure](#s3-bucket-structure)
+- [Case Configuration](#case-configuration)
+- [Assessment Lambda](#assessment-lambda)
+- [Report Generation](#report-generation)
+- [Email Delivery](#email-delivery)
+- [IAM Permissions](#iam-permissions)
+- [Adding a New Case](#adding-a-new-case)
+- [Deployment Notes](#deployment-notes)
+- [Scaling Path — RAG / Knowledge Bases](#scaling-path--rag--knowledge-bases)
+
+---
+
+## Current vs Target Architecture
+
+| Area | README target (Phase 1) | Current implementation |
+|---|---|---|
+| Trigger | EventBridge on S3 upload | **AWS Step Functions**, invoked with an explicit event payload |
+| Transcription | Lambda #1 auto-starts Transcribe on upload | Manual / external step — transcript JSON is expected to already exist in `transcripts/{caseId}/` |
+| Assessment | Lambda #2, triggered by EventBridge on transcript creation | **Single Assessment Lambda**, triggered by Step Functions |
+| Email | Amazon SNS topic | **Amazon SES** (`send_raw_email`, HTML report as attachment) |
+| Prompt | Single hardcoded prompt in `prompts/examiner-prompt.txt` | **Per-case `prompt-template.txt`** stored in S3 alongside each case's assets — no case-specific logic in code |
+| Case scaling | Not addressed | New case = new S3 folder + new `caseId` in the event. Zero code changes. |
+
+The gap between the two: the current build assumes the student's MP4 has already been transcribed (Lambda #1 / auto-Transcribe is not yet wired up) and starts from the transcript JSON. This was a deliberate sequencing choice to get the scoring and reporting pipeline working end-to-end first.
+
+---
+
+## Component Overview
+
+| Service | Role in this implementation |
+|---|---|
+| **AWS Step Functions** | Orchestrates and validates each assessment run. Entry point for manual or scheduled triggers. |
+| **AWS Lambda** (Assessment Engine) | Single function: loads case assets + transcript from S3, builds the prompt, calls Bedrock, generates the HTML report, uploads it, sends the email. |
+| **Amazon Bedrock (Claude)** | Scores the student transcript against the case's marking matrix and reference answer, given the case image. |
+| **Amazon S3** | Stores case assets, student transcripts, and generated reports. Also stores each case's prompt template. |
+| **Amazon SES** | Sends the HTML report as an email attachment to a recipient specified per-invocation. |
+| **Amazon CloudWatch** | Lambda logs (`print()` statements trace each stage: case load, prompt build, Bedrock call, upload, email). |
+
+---
+
+## Trigger Flow
+
+Unlike the README's fully automatic pipeline, the assessment stage is invoked directly with a structured event — either manually via the Step Functions console, on a schedule, or from an upstream system once a transcript is ready.
+
+**Event schema:**
+
+```json
+{
+  "caseId": "case1-amalgam-highspot",
+  "student_json_key": "transcripts/case1-amalgam-highspot/student1.json",
+  "emailId": "academy@planore.co.uk"
+}
+```
+
+**Step Functions state machine** (`statemachine/ore-assessor.asl.json`):
+
+1. **ValidateInput** — Choice state checks `caseId`, `student_json_key`, and `emailId` are all present. Missing fields fail fast with a clear error rather than letting the Lambda throw a generic exception.
+2. **InvokeLambda** — Invokes the Assessment Lambda with the validated payload. Retries up to 2 times on transient Bedrock/Lambda service errors.
+3. **CheckResult** — Inspects the Lambda's `statusCode`. `200` → Succeed; anything else → Fail.
+
+This gives the pipeline structured retries and a clear audit trail per execution in the Step Functions console, which a bare Lambda invocation wouldn't provide.
+
+---
+
+## S3 Bucket Structure
+
+```
+planore-ai-tutor/
+
+cases/
+├── case1-amalgam-highspot/
+│   ├── case-study.jpeg
+│   ├── case-evaluation-matrix-extracted.txt
+│   ├── reference-knowledge.json
+│   └── prompt-template.txt
+│
+├── case2-amalgam-concerns/
+│   ├── case-study.jpeg
+│   ├── case-evaluation-matrix-extracted.txt
+│   ├── reference-knowledge.json
+│   └── prompt-template.txt
+│
+└── caseN-.../                     ← same 4-file pattern for every new case
+
+transcripts/
+├── case1-amalgam-highspot/
+│   └── student1.json              ← Amazon Transcribe output format
+│
+reports/
+├── case1-amalgam-highspot/
+│   └── student1-report.html       ← generated by the Lambda
+```
+
+Every case folder under `cases/` is self-contained: image, marking matrix, reference transcript, and prompt template. The Lambda never hardcodes anything case-specific — it only knows the four filenames it expects inside `cases/{caseId}/`.
+
+---
+
+## Case Configuration
+
+Each case is fully defined by its four files:
+
+| File | Purpose |
+|---|---|
+| `case-study.jpeg` | The clinical case sheet image shown to Claude alongside the prompt |
+| `case-evaluation-matrix-extracted.txt` | The official marking rubric — criteria, points, done/not-done structure |
+| `reference-knowledge.json` | Amazon Transcribe-format JSON containing the model/reference answer transcript |
+| `prompt-template.txt` | The full examiner prompt for this case, with `{marking_matrix}`, `{reference_answer}`, and `{student_answer}` placeholders |
+
+Because the prompt lives in S3 rather than in code, each case can have its own examiner persona, scoring philosophy, sample JSON structure, and criteria — all without touching `lambda_function.py`. Case-specific instructions (e.g. "ignore patient name/gender mismatches", "refer to the candidate only as 'the Student'") live entirely inside that case's `prompt-template.txt`.
+
+---
+
+## Assessment Lambda
+
+Single-purpose function (`lambda/assessment-engine/lambda_function.py`), roughly in this order:
+
+1. Validates `student_json_key` and `emailId` are present in the event.
+2. Reads four case files from `cases/{caseId}/` — image (base64), marking matrix, reference JSON, prompt template.
+3. Reads the student transcript from the given `student_json_key`.
+4. Extracts plain transcript text from both reference and student Transcribe JSON.
+5. Fills the prompt template (`str.format()`) with the marking matrix, reference answer, and student answer.
+6. Calls `bedrock-runtime.invoke_model` with the case image + filled prompt, using Claude on Bedrock.
+7. Strips markdown fences from the response and parses it as JSON.
+8. Renders the assessment JSON into a styled, print-ready HTML report.
+9. Uploads the report to `reports/{caseId}/{studentFile}-report.html`.
+10. Sends the HTML report as an email attachment via SES to the `emailId` from the event.
+11. Returns a structured success/failure response (`statusCode` 200 or 500).
+
+---
+
+## Report Generation
+
+The HTML report structure is **fully generic** — it iterates over whatever `criteria`, `strengths`, `areas_for_improvement`, and `confidence_assessment` fields Claude returns, regardless of case. Only the prompt (and therefore Claude's output content) is case-specific; the report template itself never needs to change when a new case is added.
+
+Report sections:
+- Overall score and grade
+- Per-criterion score table with detailed feedback
+- Confidence & delivery assessment
+- Key strengths
+- Areas for improvement (with a "Critical Error" badge for flagged items)
+- Final examiner summary
+
+---
+
+## Email Delivery
+
+- **Service:** Amazon SES (`send_raw_email`), not SNS as in the README's Phase 1 diagram.
+- **Recipient:** supplied per-invocation via `emailId` in the event — not hardcoded.
+- **Subject:** the `caseId`.
+- **Body:** plain-text pointer to the attachment.
+- **Attachment:** the full HTML report, as a `.html` file.
+
+**Sandbox mode note:** while the SES account is in sandbox mode, both the sender and every recipient address must be individually verified under **SES → Identities**. Production access removes the recipient verification requirement.
+
+---
+
+## IAM Permissions
+
+**Assessment Lambda execution role:**
+- `s3:GetObject`, `s3:PutObject` on the case/transcript/report prefixes
+- `bedrock:InvokeModel`
+- `ses:SendRawEmail`
+
+**Step Functions execution role:**
+- `lambda:InvokeFunction` scoped to the Assessment Lambda's ARN
+- `logs:CreateLogGroup`, `logs:CreateLogDelivery`, `logs:PutLogEvents`, `logs:DescribeLogGroups`, `logs:DescribeResourcePolicies`
+
+---
+
+## Adding a New Case
+
+No code changes required. To onboard `caseN`:
+
+1. Create `cases/caseN-<slug>/` in S3.
+2. Upload `case-study.jpeg`, `case-evaluation-matrix-extracted.txt`, `reference-knowledge.json`.
+3. Write a `prompt-template.txt` for the case (copy an existing one as a starting point, adjust the case context, marking breakdown, and sample JSON).
+4. Upload the student's transcript to `transcripts/caseN-<slug>/studentX.json`.
+5. Invoke the state machine with:
+   ```json
+   {
+     "caseId": "caseN-<slug>",
+     "student_json_key": "transcripts/caseN-<slug>/studentX.json",
+     "emailId": "recipient@domain.com"
+   }
+   ```
+
+---
+
+## Deployment Notes
+
+- Lambda environment variables required: `BUCKET_NAME`, `MODEL_ID`, `REGION` (defaults to `eu-west-2`), `SES_SENDER`.
+- The Bedrock model ID must be enabled for the account/region in **Bedrock → Model access**.
+- SES sender identity must be verified before any email will send, regardless of sandbox/production status.
+
+---
+
+## Scaling Path — RAG / Knowledge Bases
+
+The current S3-per-case approach is simple and works well up to roughly 20–50 cases. Beyond that, loading full reference transcripts and marking matrices into every Lambda invocation becomes inefficient, and there's no way to query across cases.
+
+**Planned evolution** (aligns with the README's Phase 3 roadmap):
+
+| Stays on S3 | Moves to a vector store |
+|---|---|
+| Case images (JPEG) | Chunked reference knowledge transcripts |
+| Student transcripts (JSON) | Chunked marking matrices |
+| Prompt templates (txt) | Chunked case study scenarios |
+
+**Target services:**
+- **Amazon Bedrock Knowledge Bases** — chunking, embedding, and retrieval, connected directly to the existing S3 bucket as a data source
+- **Amazon Titan Embeddings v2** — embedding model
+- **OpenSearch Serverless** — vector backend
+
+At that point, instead of loading an entire reference transcript into the prompt, the Lambda retrieves only the chunks most relevant to what the student actually said — reducing prompt size, improving scoring relevance, and enabling cross-case queries (e.g. "find all cases assessing empathy").
+
+**Recommended trigger points:**
+- **< 20 cases:** keep the current S3-only approach
+- **20–50 cases:** start indexing reference knowledge and marking matrices into a Knowledge Base alongside S3
+- **50+ cases:** migrate reference knowledge retrieval fully to RAG; S3 remains the source of truth for images, transcripts, and prompt templates
