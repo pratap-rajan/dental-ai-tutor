@@ -32,6 +32,24 @@ def read_s3_image_base64(bucket, key):
     return base64.b64encode(response["Body"].read()).decode("utf-8")
 
 
+def try_read_s3_image_base64(bucket, key):
+    """
+    Attempts to read an optional case image from S3.
+    Returns None if the object does not exist, so text-only cases work
+    without a case-study.jpeg file. Any other S3 error still raises.
+    """
+    try:
+        return read_s3_image_base64(bucket, key)
+    except s3.exceptions.NoSuchKey:
+        print(f"No case image found at {key} — proceeding text-only")
+        return None
+    except s3.exceptions.ClientError as ex:
+        if ex.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+            print(f"No case image found at {key} — proceeding text-only")
+            return None
+        raise
+
+
 def extract_transcript(transcribe_json_text):
     """Extracts the raw transcript from an Amazon Transcribe JSON structure."""
     data = json.loads(transcribe_json_text)
@@ -65,8 +83,29 @@ def build_prompt(prompt_template, marking_matrix, reference_answer, student_answ
     )
 
 
-def invoke_claude_with_image(image_base64, prompt):
-    """Invokes the Claude model via Bedrock with an image and text prompt."""
+def invoke_claude(prompt, image_base64=None):
+    """
+    Invokes the Claude model via Bedrock with a text prompt, and an
+    optional case image. If image_base64 is None, the request is sent
+    as text-only — used for cases that have no case-study.jpeg.
+    """
+    content = []
+
+    if image_base64:
+        content.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/jpeg",
+                "data": image_base64
+            }
+        })
+
+    content.append({
+        "type": "text",
+        "text": prompt
+    })
+
     body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 4000,
@@ -74,20 +113,7 @@ def invoke_claude_with_image(image_base64, prompt):
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": image_base64
-                        }
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt
-                    }
-                ]
+                "content": content
             }
         ]
     }
@@ -343,7 +369,7 @@ def lambda_handler(event, context):
         case_image_key    = f"cases/{case_id}/case-study.jpeg"
         marking_key       = f"cases/{case_id}/case-evaluation-matrix-extracted.txt"
         reference_key     = f"cases/{case_id}/reference-knowledge.json"
-        prompt_key        = f"cases/{case_id}/prompt-text.txt"
+        prompt_key        = f"cases/{case_id}/prompt-template.txt"
 
         print(f"Loading case resources for {case_id}")
 
@@ -351,7 +377,7 @@ def lambda_handler(event, context):
         # Read all S3 inputs
         #
 
-        case_image_base64 = read_s3_image_base64(BUCKET_NAME, case_image_key)
+        case_image_base64 = try_read_s3_image_base64(BUCKET_NAME, case_image_key)
         marking_matrix    = read_s3_text(BUCKET_NAME, marking_key)
         reference_json    = read_s3_text(BUCKET_NAME, reference_key)
         student_json      = read_s3_text(BUCKET_NAME, student_json_key)
@@ -379,9 +405,9 @@ def lambda_handler(event, context):
         # Claude evaluation
         #
 
-        result_text = invoke_claude_with_image(
-            case_image_base64,
-            prompt
+        result_text = invoke_claude(
+            prompt,
+            image_base64=case_image_base64
         )
 
         assessment = json.loads(
