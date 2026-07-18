@@ -1,6 +1,6 @@
 # Architecture — Current Implementation
 
-This document describes the **as-built** architecture of the Dental AI Tutor assessment pipeline, as deployed in the `planore-ai-tutor` AWS account. It supplements the main [README](./README.md), which describes the target end-to-end vision (upload → auto-transcribe → auto-assess → SNS email). The current implementation covers the **assessment stage** of that pipeline, triggered explicitly rather than via automatic EventBridge chaining from upload.
+This document describes the **as-built** architecture of the Dental AI Tutor assessment pipeline, as deployed in the `planore-ai-tutor` AWS account. It supplements the main [README](https://github.com/pratap-rajan/dental-ai-tutor/blob/main/README.md), which describes the target end-to-end vision (upload → auto-transcribe → auto-assess → SNS email). The current implementation covers the **assessment stage** of that pipeline, triggered explicitly rather than via automatic EventBridge chaining from upload.
 
 ---
 
