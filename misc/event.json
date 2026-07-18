@@ -1,5 +1,12 @@
-{
-  "caseId": "case1-amalgam-highspot",
-  "student_json_key": "transcripts/case1-amalgam-highspot/student1.json",
-  "emailId": "academy@planore.co.uk"
-}
+[
+  {
+    "caseId": "case1-amalgam-highspot",
+    "student_json_key": "transcripts/case1-amalgam-highspot/student1.json",
+    "emailId": "academy@planore.co.uk"
+  },
+  {
+    "caseId": "case2-amalgam-toxicity-filling",
+    "student_json_key": "transcripts/case2-amalgam-toxicity-filling/student1.json",
+    "emailId": "academy@planore.co.uk"
+  }
+]

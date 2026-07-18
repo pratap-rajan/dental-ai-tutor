@@ -265,6 +265,7 @@ cases/
 │   ├── case-study.jpeg
 │   ├── marking-matrix.txt
 │   └── reference-transcript.json
+|   └── prompt-text.txt
 │
 student-uploads/
 │
