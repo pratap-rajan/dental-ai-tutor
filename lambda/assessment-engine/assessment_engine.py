@@ -32,6 +32,23 @@ def read_s3_image_base64(bucket, key):
     return base64.b64encode(response["Body"].read()).decode("utf-8")
 
 
+def try_read_s3_text(bucket, key):
+    """
+    Attempts to read an optional text file from S3.
+    Returns None if the object does not exist. Any other S3 error still raises.
+    """
+    try:
+        return read_s3_text(bucket, key)
+    except s3.exceptions.NoSuchKey:
+        print(f"No file found at {key} — skipping")
+        return None
+    except s3.exceptions.ClientError as ex:
+        if ex.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+            print(f"No file found at {key} — skipping")
+            return None
+        raise
+
+
 def try_read_s3_image_base64(bucket, key):
     """
     Attempts to read an optional case image from S3.
@@ -68,18 +85,24 @@ def clean_json_response(text):
     return text.strip()
 
 
-def build_prompt(prompt_template, marking_matrix, reference_answer, student_answer):
+def build_prompt(prompt_template, marking_matrix, reference_answer, student_answer, case_study=""):
     """
-    Fills the prompt template loaded from S3 with the three dynamic values.
-    The template must contain exactly these placeholders:
+    Fills the prompt template loaded from S3 with the dynamic values.
+    The template must contain these placeholders:
         {marking_matrix}
         {reference_answer}
         {student_answer}
+    It may optionally contain:
+        {case_study}   — filled with case-study.txt content when there is
+                          no case-study.jpeg image for this case. If the
+                          template doesn't reference {case_study}, this
+                          value is simply ignored.
     """
     return prompt_template.format(
         marking_matrix=marking_matrix,
         reference_answer=reference_answer,
-        student_answer=student_answer
+        student_answer=student_answer,
+        case_study=case_study
     )
 
 
@@ -367,6 +390,7 @@ def lambda_handler(event, context):
         #
 
         case_image_key    = f"cases/{case_id}/case-study.jpeg"
+        case_study_key    = f"cases/{case_id}/case-study.txt"
         marking_key       = f"cases/{case_id}/case-evaluation-matrix-extracted.txt"
         reference_key     = f"cases/{case_id}/reference-knowledge.json"
         prompt_key        = f"cases/{case_id}/prompt-template.txt"
@@ -376,12 +400,37 @@ def lambda_handler(event, context):
         #
         # Read all S3 inputs
         #
+        # Case study can be provided either as an image (case-study.jpeg)
+        # or as plain text (case-study.txt). If the image exists, it is
+        # sent to Claude as visual context and no text case study is
+        # needed. If the image is missing, we fall back to the text file.
+        #
 
         case_image_base64 = try_read_s3_image_base64(BUCKET_NAME, case_image_key)
+
+        case_study_text = ""
+        if not case_image_base64:
+            case_study_text = try_read_s3_text(BUCKET_NAME, case_study_key) or ""
+            if case_study_text:
+                print(f"Using text case study from {case_study_key}")
+            else:
+                print(f"No case-study.jpeg or case-study.txt found for {case_id} — proceeding without case study context")
+
+        print(f"Reading marking matrix: {marking_key}")
         marking_matrix    = read_s3_text(BUCKET_NAME, marking_key)
+        print("✓ marking matrix loaded")
+
+        print(f"Reading reference knowledge: {reference_key}")
         reference_json    = read_s3_text(BUCKET_NAME, reference_key)
+        print("✓ reference knowledge loaded")
+
+        print(f"Reading student transcript: {student_json_key}")
         student_json      = read_s3_text(BUCKET_NAME, student_json_key)
+        print("✓ student transcript loaded")
+
+        print(f"Reading prompt template: {prompt_key}")
         prompt_template   = read_s3_text(BUCKET_NAME, prompt_key)
+        print("✓ prompt template loaded")
 
         #
         # Extract transcripts
@@ -398,7 +447,8 @@ def lambda_handler(event, context):
             prompt_template,
             marking_matrix,
             reference_answer,
-            student_answer
+            student_answer,
+            case_study=case_study_text
         )
 
         #
@@ -453,3 +503,4 @@ def lambda_handler(event, context):
                 "error": str(ex)
             }
         }
+        
