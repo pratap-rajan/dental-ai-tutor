@@ -83,9 +83,15 @@ def lambda_handler(event, context):
         # student-uploads/case1-amalgam-highspot/shweta.mp4
         #
 
-        filename     = mp4_file.split("/")[-1]
+        parts = mp4_file.split("/")
+        if len(parts) < 3:
+            raise Exception(
+                f"Unexpected upload key shape (expected student-uploads/{{caseId}}/{{student}}.mp4): {mp4_file}"
+            )
+
+        filename     = parts[-1]
         student_name = filename.rsplit(".", 1)[0]
-        case_id      = mp4_file.split("/")[1]
+        case_id      = parts[1]
 
         output_key = f"{OUTPUT_PREFIX}/{case_id}/{student_name}.json"
 
@@ -125,4 +131,3 @@ def lambda_handler(event, context):
                 "error": str(ex)
             }
         }
-        
