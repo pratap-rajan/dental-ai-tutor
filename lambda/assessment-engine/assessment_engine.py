@@ -1,6 +1,7 @@
 import json
 import os
 import base64
+import urllib.parse
 import boto3
 
 s3 = boto3.client("s3")
@@ -18,6 +19,79 @@ ses = boto3.client(
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 MODEL_ID    = os.environ["MODEL_ID"]
 REPORT_SENDER = os.environ.get("SES_SENDER", "academy@planore.co.uk")
+DEFAULT_NOTIFY_EMAIL = os.environ.get("DEFAULT_NOTIFY_EMAIL")
+
+
+def get_s3_key_from_event(event):
+    """
+    If this Lambda was triggered automatically by a transcript landing
+    in S3 (directly via S3 Event Notification, or via EventBridge),
+    returns the object key. Returns None if the event doesn't look like
+    an S3 notification (e.g. a manual/Step Functions invocation).
+    """
+    try:
+        records = event.get("Records")
+        if records:
+            key = records[0]["s3"]["object"]["key"]
+            return urllib.parse.unquote_plus(key)
+    except (KeyError, IndexError, TypeError):
+        pass
+
+    # EventBridge S3 notification shape
+    try:
+        detail = event.get("detail", {})
+        key = detail["object"]["key"]
+        return urllib.parse.unquote_plus(key)
+    except (KeyError, TypeError):
+        pass
+
+    return None
+
+
+def resolve_input(event):
+    """
+    Works out caseId, student_json_key, and emailId regardless of how
+    this Lambda was triggered:
+
+    1. Manual / Step Functions invocation — event already contains
+       "caseId", "student_json_key", "emailId" explicitly.
+
+    2. Automated trigger — event is a raw S3 Event Notification or
+       EventBridge "Object Created" event fired when a student's
+       transcript JSON lands under transcripts/{caseId}/{student}.json.
+       caseId and student_json_key are derived from the object key;
+       emailId falls back to DEFAULT_NOTIFY_EMAIL since there's no
+       human providing it at upload time.
+    """
+    # Manual / Step Functions shape takes priority if present
+    if event.get("student_json_key"):
+        return (
+            event.get("caseId", "case1-amalgam-highspot"),
+            event["student_json_key"],
+            event.get("emailId") or DEFAULT_NOTIFY_EMAIL
+        )
+
+    # Automated S3 / EventBridge shape
+    key = get_s3_key_from_event(event)
+    if not key:
+        raise Exception(
+            "Could not determine student_json_key: event has neither "
+            "an explicit 'student_json_key' field nor a recognizable "
+            "S3/EventBridge object key."
+        )
+
+    if not key.lower().endswith(".json"):
+        raise Exception(f"Triggering object is not a JSON transcript: {key}")
+
+    parts = key.split("/")
+    if len(parts) < 3:
+        raise Exception(
+            f"Unexpected transcript key shape (expected transcripts/{{caseId}}/{{student}}.json): {key}"
+        )
+
+    case_id = parts[1]
+
+    return (case_id, key, DEFAULT_NOTIFY_EMAIL)
 
 
 def read_s3_text(bucket, key):
@@ -356,24 +430,31 @@ def lambda_handler(event, context):
     print("EVENT =", json.dumps(event))
 
     #
-    # Expected event:
+    # Two ways this Lambda gets invoked:
     #
+    # 1. Manual / Step Functions:
     # {
     #   "caseId":           "case1-amalgam-highspot",
     #   "student_json_key": "transcripts/case1-amalgam-highspot/student1.json",
     #   "emailId":          "academy@planore.co.uk"
     # }
     #
+    # 2. Automated — triggered when a transcript JSON lands in S3
+    #    (raw S3 Event Notification or EventBridge "Object Created"
+    #    event). caseId + student_json_key are derived from the S3 key;
+    #    emailId falls back to the DEFAULT_NOTIFY_EMAIL env var.
+    #
 
-    case_id          = event.get("caseId", "case1-amalgam-highspot")
-    student_json_key = event.get("student_json_key")
-    email_id         = event.get("emailId")
+    case_id, student_json_key, email_id = resolve_input(event)
 
     if not student_json_key:
         raise Exception("student_json_key missing from event")
 
     if not email_id:
-        raise Exception("emailId missing from event")
+        raise Exception(
+            "No emailId available — set the DEFAULT_NOTIFY_EMAIL "
+            "environment variable for automated (non-manual) invocations."
+        )
 
     file_prefix = (
         student_json_key
@@ -503,4 +584,3 @@ def lambda_handler(event, context):
                 "error": str(ex)
             }
         }
-        
