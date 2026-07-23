@@ -20,6 +20,7 @@ BUCKET_NAME = os.environ["BUCKET_NAME"]
 MODEL_ID    = os.environ["MODEL_ID"]
 REPORT_SENDER = os.environ.get("SES_SENDER", "academy@planore.co.uk")
 DEFAULT_NOTIFY_EMAIL = os.environ.get("DEFAULT_NOTIFY_EMAIL")
+DEFAULT_REPORT_TYPE = os.environ.get("DEFAULT_REPORT_TYPE", "detailed")
 
 
 def get_s3_key_from_event(event):
@@ -50,25 +51,33 @@ def get_s3_key_from_event(event):
 
 def resolve_input(event):
     """
-    Works out caseId, student_json_key, and emailId regardless of how
-    this Lambda was triggered:
+    Works out caseId, student_json_key, emailId, and reportType regardless
+    of how this Lambda was triggered:
 
     1. Manual / Step Functions invocation — event already contains
-       "caseId", "student_json_key", "emailId" explicitly.
+       "caseId", "student_json_key", "emailId", optionally "reportType".
 
     2. Automated trigger — event is a raw S3 Event Notification or
        EventBridge "Object Created" event fired when a student's
        transcript JSON lands under transcripts/{caseId}/{student}.json.
        caseId and student_json_key are derived from the object key;
        emailId falls back to DEFAULT_NOTIFY_EMAIL since there's no
-       human providing it at upload time.
+       human providing it at upload time; reportType falls back to
+       DEFAULT_REPORT_TYPE.
+
+    reportType is either "detailed" (full report, including the
+    per-criterion breakdown table) or "basic" (score, grade, strengths,
+    areas for improvement, and final summary only — no criteria table).
+    Any other/missing value falls back to "detailed".
     """
     # Manual / Step Functions shape takes priority if present
     if event.get("student_json_key"):
+        report_type = event.get("reportType") or DEFAULT_REPORT_TYPE
         return (
             event.get("caseId", "case1-amalgam-highspot"),
             event["student_json_key"],
-            event.get("emailId") or DEFAULT_NOTIFY_EMAIL
+            event.get("emailId") or DEFAULT_NOTIFY_EMAIL,
+            report_type if report_type in ("detailed", "basic") else "detailed"
         )
 
     # Automated S3 / EventBridge shape
@@ -91,7 +100,9 @@ def resolve_input(event):
 
     case_id = parts[1]
 
-    return (case_id, key, DEFAULT_NOTIFY_EMAIL)
+    report_type = DEFAULT_REPORT_TYPE if DEFAULT_REPORT_TYPE in ("detailed", "basic") else "detailed"
+
+    return (case_id, key, DEFAULT_NOTIFY_EMAIL, report_type)
 
 
 def read_s3_text(bucket, key):
@@ -222,8 +233,19 @@ def invoke_claude(prompt, image_base64=None):
     return response_body["content"][0]["text"]
 
 
-def generate_html_report(assessment, report_key):
-    """Constructs a responsive, print-ready HTML report from the assessment JSON."""
+def generate_html_report(assessment, report_key, report_type="detailed"):
+    """
+    Constructs a responsive, print-ready HTML report from the assessment JSON.
+
+    report_type:
+        "detailed" (default) — full report including the per-criterion
+                                breakdown table.
+        "basic"              — score, grade, strengths, areas for
+                                improvement, and final summary only.
+                                Skips the criteria breakdown table and
+                                the confidence/delivery section, which
+                                are the most granular/repetitive parts.
+    """
     table_rows = ""
     for criterion in assessment.get("criteria", []):
         table_rows += f"""
@@ -249,6 +271,32 @@ def generate_html_report(assessment, report_key):
             improvements_list += f'<li class="improvement-item">{imp}</li>'
 
     confidence = assessment.get("confidence_assessment", {})
+
+    is_detailed = report_type == "detailed"
+
+    report_type_badge = " · Basic Summary" if not is_detailed else ""
+
+    criteria_section = f"""
+    <h2>Criteria Breakdowns</h2>
+    <div class="crit-table">
+        <div class="crit-header">
+            <div class="crit-cell" style="width: 25%;">Assessment Domain</div>
+            <div class="crit-cell" style="width: 12%; text-align: center;">Score</div>
+            <div class="crit-cell" style="width: 63%;">Detailed Evaluator Feedback</div>
+        </div>
+        {table_rows}
+    </div>
+    """ if is_detailed else ""
+
+    confidence_section = f"""
+    <div class="avoid-break">
+        <h2>Confidence &amp; Delivery Assessment</h2>
+        <div class="feedback-box">
+            <div style="font-weight: bold; color: #334155; margin-bottom: 10px;">Confidence Score: <span style="color: #0284c7;">{confidence.get('score', 0)}/100</span></div>
+            <p style="margin: 0; color: #475569; font-size: 9.5pt;">{confidence.get('feedback', '')}</p>
+        </div>
+    </div>
+    """ if is_detailed else ""
 
     return f"""<!DOCTYPE html>
 <html>
@@ -304,7 +352,7 @@ def generate_html_report(assessment, report_key):
                 <div class="subtitle">UK ORE-Style Examination Assessment</div>
             </div>
             <div class="header-cell header-right">
-                <span style="font-size: 9pt; color: #64748b; font-weight: 500;">Status: Evaluated</span>
+                <span style="font-size: 9pt; color: #64748b; font-weight: 500;">Status: Evaluated{report_type_badge}</span>
             </div>
         </div>
     </div>
@@ -335,23 +383,9 @@ def generate_html_report(assessment, report_key):
         </div>
     </div>
 
-    <h2>Criteria Breakdowns</h2>
-    <div class="crit-table">
-        <div class="crit-header">
-            <div class="crit-cell" style="width: 25%;">Assessment Domain</div>
-            <div class="crit-cell" style="width: 12%; text-align: center;">Score</div>
-            <div class="crit-cell" style="width: 63%;">Detailed Evaluator Feedback</div>
-        </div>
-        {table_rows}
-    </div>
+    {criteria_section}
 
-    <div class="avoid-break">
-        <h2>Confidence &amp; Delivery Assessment</h2>
-        <div class="feedback-box">
-            <div style="font-weight: bold; color: #334155; margin-bottom: 10px;">Confidence Score: <span style="color: #0284c7;">{confidence.get('score', 0)}/100</span></div>
-            <p style="margin: 0; color: #475569; font-size: 9.5pt;">{confidence.get('feedback', '')}</p>
-        </div>
-    </div>
+    {confidence_section}
 
     <div class="avoid-break">
         <h2>Key Strengths</h2>
@@ -436,16 +470,18 @@ def lambda_handler(event, context):
     # {
     #   "caseId":           "case1-amalgam-highspot",
     #   "student_json_key": "transcripts/case1-amalgam-highspot/student1.json",
-    #   "emailId":          "academy@planore.co.uk"
+    #   "emailId":          "academy@planore.co.uk",
+    #   "reportType":       "detailed"   <- optional, "detailed" | "basic", defaults to "detailed"
     # }
     #
     # 2. Automated — triggered when a transcript JSON lands in S3
     #    (raw S3 Event Notification or EventBridge "Object Created"
     #    event). caseId + student_json_key are derived from the S3 key;
-    #    emailId falls back to the DEFAULT_NOTIFY_EMAIL env var.
+    #    emailId falls back to the DEFAULT_NOTIFY_EMAIL env var;
+    #    reportType falls back to the DEFAULT_REPORT_TYPE env var.
     #
 
-    case_id, student_json_key, email_id = resolve_input(event)
+    case_id, student_json_key, email_id, report_type = resolve_input(event)
 
     if not student_json_key:
         raise Exception("student_json_key missing from event")
@@ -551,7 +587,7 @@ def lambda_handler(event, context):
 
         report_key = f"reports/{case_id}/{file_prefix}-report.html"
 
-        html_report = generate_html_report(assessment, report_key)
+        html_report = generate_html_report(assessment, report_key, report_type=report_type)
 
         print(f"Uploading report to {report_key}")
 
@@ -570,7 +606,8 @@ def lambda_handler(event, context):
                 "caseId":        case_id,
                 "student":       file_prefix,
                 "report_s3_key": report_key,
-                "email_sent_to": email_id
+                "email_sent_to": email_id,
+                "reportType":    report_type
             }
         }
 
