@@ -49,6 +49,30 @@ def get_s3_key_from_event(event):
     return None
 
 
+def read_upload_metadata(bucket, case_id, student_name):
+    """
+    Reads the optional metadata sidecar file written at upload time by the
+    presigned-URL Lambda, at:
+        student-uploads/{caseId}/{studentName}.metadata.json
+    Expected shape: {"emailId": "...", "reportType": "detailed"|"basic"}
+    Returns {} if the sidecar doesn't exist — automated invocations then
+    fall back to DEFAULT_NOTIFY_EMAIL / DEFAULT_REPORT_TYPE as before, so
+    this is fully backward compatible with uploads that don't create one
+    (e.g. manual S3 console uploads or older client versions).
+    """
+    key = f"student-uploads/{case_id}/{student_name}.metadata.json"
+    raw = try_read_s3_text(BUCKET_NAME, key)
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+        print(f"Loaded upload metadata from {key}: {data}")
+        return data
+    except json.JSONDecodeError:
+        print(f"Metadata file at {key} was not valid JSON — ignoring")
+        return {}
+
+
 def resolve_input(event):
     """
     Works out caseId, student_json_key, emailId, and reportType regardless
@@ -60,15 +84,17 @@ def resolve_input(event):
     2. Automated trigger — event is a raw S3 Event Notification or
        EventBridge "Object Created" event fired when a student's
        transcript JSON lands under transcripts/{caseId}/{student}.json.
-       caseId and student_json_key are derived from the object key;
-       emailId falls back to DEFAULT_NOTIFY_EMAIL since there's no
-       human providing it at upload time; reportType falls back to
-       DEFAULT_REPORT_TYPE.
+       caseId and student_json_key are derived from the object key.
+       emailId and reportType are read from the upload metadata sidecar
+       file (student-uploads/{caseId}/{student}.metadata.json), written
+       by the presigned-URL Lambda when the student originally uploaded
+       via the React portal. If that sidecar doesn't exist, falls back
+       to DEFAULT_NOTIFY_EMAIL / DEFAULT_REPORT_TYPE.
 
     reportType is either "detailed" (full report, including the
     per-criterion breakdown table) or "basic" (score, grade, strengths,
-    areas for improvement, and final summary only — no criteria table).
-    Any other/missing value falls back to "detailed".
+    areas for improvement, and final summary only). Any other/missing
+    value falls back to "detailed".
     """
     # Manual / Step Functions shape takes priority if present
     if event.get("student_json_key"):
@@ -99,10 +125,17 @@ def resolve_input(event):
         )
 
     case_id = parts[1]
+    student_name = parts[-1].rsplit(".", 1)[0]
 
-    report_type = DEFAULT_REPORT_TYPE if DEFAULT_REPORT_TYPE in ("detailed", "basic") else "detailed"
+    metadata = read_upload_metadata(BUCKET_NAME, case_id, student_name)
 
-    return (case_id, key, DEFAULT_NOTIFY_EMAIL, report_type)
+    email_id = metadata.get("emailId") or DEFAULT_NOTIFY_EMAIL
+
+    report_type = metadata.get("reportType") or DEFAULT_REPORT_TYPE
+    if report_type not in ("detailed", "basic"):
+        report_type = "detailed"
+
+    return (case_id, key, email_id, report_type)
 
 
 def read_s3_text(bucket, key):
