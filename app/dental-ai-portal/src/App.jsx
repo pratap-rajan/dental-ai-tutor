@@ -1,11 +1,11 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import Header from "./Header.jsx";
 import Hero from "./Hero.jsx";
 import Features from "./Features.jsx";
 import HowItWorks from "./HowItWorks.jsx";
 import UploadForm from "./UploadForm.jsx";
 import Confirmation from "./Confirmation.jsx";
 import Footer from "./Footer.jsx";
-import { useState } from "react";
 
 export default function App() {
   const [submission, setSubmission] = useState(null);
@@ -17,6 +17,7 @@ export default function App() {
 
   return (
     <div style={{ background: "#293039" }}>
+      <Header onCtaClick={scrollToForm} />
       <Hero onCtaClick={scrollToForm} />
       <Features />
       <HowItWorks />
