@@ -12,9 +12,9 @@ export default function Hero({ onCtaClick }) {
         </div>
 
         <h1 style={styles.headline}>
-          Pass faster with your
+          Practice faster with your own
           <br />
-          <span style={styles.headlineAccent}>AI study buddy</span>
+          <span style={{ ...styles.headlineAccent, fontStyle: "italic" }}>ORE Buddy</span> — AI Study Pal
         </h1>
 
         <p style={styles.subhead}>

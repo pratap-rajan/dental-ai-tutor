@@ -50,7 +50,7 @@ const styles = {
     fontSize: 17,
     fontWeight: 600,
     letterSpacing: "0.03em",
-    color: theme.white,
+    color: theme.teal,
     whiteSpace: "nowrap"
   },
   cta: {

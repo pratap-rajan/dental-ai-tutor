@@ -3,8 +3,8 @@
 // -----------------------------------------------------------------------
 
 // The API Gateway endpoint that fronts your presigned-URL Lambda.
-// e.g. "https://abc123.execute-api.eu-west-2.amazonaws.com/prod"
-export const API_BASE_URL = "https://YOUR_API_ID.execute-api.eu-west-2.amazonaws.com/prod";
+// Deployed to the $default stage, so there is no /prod suffix.
+export const API_BASE_URL = "https://rc98xaw0tg.execute-api.eu-west-2.amazonaws.com";
 
 // Case catalog shown in the dropdown. Keep "id" identical to the
 // caseId used in your S3 folder structure (cases/{id}/...), since
@@ -21,6 +21,10 @@ export const CASE_CATALOG = [
   {
     id: "case2-amalgam-toxicity-filling",
     label: "Case 2 — Amalgam toxicity concerns"
+  },
+  {
+    id: "case3-avulsed-tooth",
+    label: "Case 3 — Avulsed tooth (telephone triage)"
   }
 ];
 
