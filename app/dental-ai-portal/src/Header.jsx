@@ -22,8 +22,8 @@ const styles = {
     position: "sticky",
     top: 0,
     zIndex: 50,
-    background: "rgba(41, 48, 57, 0.92)",
-    backdropFilter: "blur(8px)",
+    background: "rgba(13, 14, 26, 0.85)",
+    backdropFilter: "blur(10px)",
     borderBottom: `1px solid ${theme.navyLighter}`,
     fontFamily: fonts.body
   },
@@ -54,11 +54,11 @@ const styles = {
     whiteSpace: "nowrap"
   },
   cta: {
-    background: theme.teal,
-    color: theme.navy,
+    background: theme.ctaMint,
+    color: "#06231d",
     border: "none",
     fontSize: 14,
-    fontWeight: 600,
+    fontWeight: 700,
     padding: "9px 18px",
     borderRadius: 8,
     cursor: "pointer",

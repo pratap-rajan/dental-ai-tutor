@@ -14,7 +14,7 @@ export default function Hero({ onCtaClick }) {
         <h1 style={styles.headline}>
           Practice faster with your own
           <br />
-          <span style={{ ...styles.headlineAccent, fontStyle: "italic" }}>ORE Buddy</span> — AI Study Pal
+          <span style={styles.headlineGradient}>ORE Buddy</span> — AI Study Pal
         </h1>
 
         <p style={styles.subhead}>
@@ -31,6 +31,8 @@ export default function Hero({ onCtaClick }) {
             See how it works
           </a>
         </div>
+
+        <p style={styles.microcopy}>No sign-up required. Free for enrolled students.</p>
 
         <div style={styles.pillRow}>
           <Pill>Case-based ORE &amp; LDS practice</Pill>
@@ -112,7 +114,12 @@ function DemoCard() {
 
 const styles = {
   section: {
-    background: `linear-gradient(180deg, ${theme.navy} 0%, #1d232b 100%)`,
+    background: [
+      `radial-gradient(ellipse 900px 500px at 22% 10%, rgba(162,143,243,0.32), transparent 60%)`,
+      `radial-gradient(ellipse 700px 500px at 78% 78%, rgba(99,209,230,0.28), transparent 55%)`,
+      `radial-gradient(ellipse 600px 450px at 15% 85%, rgba(162,143,243,0.22), transparent 55%)`,
+      `linear-gradient(180deg, ${theme.pageBg} 0%, #0a0620 35%, #060a16 70%, ${theme.pageBg} 100%)`
+    ].join(", "),
     padding: "3.5rem 1.5rem 4rem",
     fontFamily: fonts.body
   },
@@ -129,11 +136,14 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    background: "rgba(0, 194, 203, 0.12)",
-    border: `1px solid ${theme.teal}`,
+    background: "rgba(162, 143, 243, 0.10)",
+    border: `1px solid ${theme.accentPurple}`,
     color: theme.mint,
-    fontSize: 14,
-    fontWeight: 500,
+    fontSize: 13,
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
     padding: "6px 16px",
     borderRadius: 999,
     marginBottom: "1.5rem"
@@ -142,23 +152,28 @@ const styles = {
     width: 6,
     height: 6,
     borderRadius: "50%",
-    background: theme.teal,
+    background: theme.ctaMint,
     display: "inline-block"
   },
   headline: {
     fontFamily: fonts.display,
-    fontSize: "clamp(32px, 5vw, 48px)",
-    fontWeight: 600,
-    lineHeight: 1.15,
+    fontSize: "clamp(32px, 5vw, 52px)",
+    fontWeight: 700,
+    lineHeight: 1.12,
     color: theme.white,
     margin: "0 0 1.25rem"
   },
-  headlineAccent: { color: theme.teal },
+  headlineGradient: {
+    background: `linear-gradient(90deg, ${theme.heroGradientStart}, ${theme.heroGradientEnd})`,
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text"
+  },
   subhead: {
     fontSize: 18,
     lineHeight: 1.6,
     color: theme.mint,
-    opacity: 0.85,
+    opacity: 0.8,
     maxWidth: 560,
     margin: "0 0 2rem"
   },
@@ -167,14 +182,14 @@ const styles = {
     gap: 14,
     flexWrap: "wrap",
     justifyContent: "center",
-    marginBottom: "2rem"
+    marginBottom: "0.75rem"
   },
   ctaPrimary: {
-    background: theme.teal,
-    color: theme.navy,
+    background: theme.ctaMint,
+    color: "#06231d",
     border: "none",
     fontSize: 16,
-    fontWeight: 600,
+    fontWeight: 700,
     padding: "14px 28px",
     borderRadius: 10,
     cursor: "pointer",
@@ -190,6 +205,11 @@ const styles = {
     textDecoration: "none",
     border: `1px solid ${theme.navyLighter}`,
     borderRadius: 10
+  },
+  microcopy: {
+    fontSize: 13,
+    color: theme.slateLight,
+    margin: "0 0 2rem"
   },
   pillRow: {
     display: "flex",
@@ -212,12 +232,12 @@ const styles = {
   demoCard: {
     width: "100%",
     maxWidth: 460,
-    background: theme.navyLight,
+    background: theme.pageBgLight,
     border: `1px solid ${theme.navyLighter}`,
     borderRadius: 16,
     overflow: "hidden",
     textAlign: "left",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.35)"
+    boxShadow: "0 20px 60px rgba(0,0,0,0.45)"
   },
   demoHeader: {
     display: "flex",
@@ -229,14 +249,15 @@ const styles = {
   demoHeaderLeft: { display: "flex", alignItems: "center", gap: 10 },
   demoDotRow: { display: "flex", gap: 4 },
   demoDot: { width: 8, height: 8, borderRadius: "50%", display: "inline-block" },
-  demoTitle: { fontSize: 13, color: theme.mint, fontWeight: 500 },
+  demoTitle: { fontSize: 13, color: theme.mint, fontWeight: 500, fontFamily: fonts.mono },
   demoStatus: {
     fontSize: 11,
     fontWeight: 600,
-    color: theme.teal,
-    background: "rgba(0, 194, 203, 0.12)",
+    color: theme.ctaMint,
+    background: "rgba(114, 212, 196, 0.12)",
     padding: "4px 10px",
-    borderRadius: 999
+    borderRadius: 999,
+    fontFamily: fonts.mono
   },
   demoBody: { padding: "18px" },
   demoScoreRow: {
@@ -250,8 +271,8 @@ const styles = {
   demoGradeChip: {
     fontSize: 12,
     fontWeight: 600,
-    color: theme.navy,
-    background: theme.teal,
+    color: "#06231d",
+    background: theme.ctaMint,
     padding: "6px 12px",
     borderRadius: 999
   },
@@ -261,7 +282,7 @@ const styles = {
     width: 6,
     height: 6,
     borderRadius: "50%",
-    background: "#00c2cb",
+    background: theme.accentPurple,
     marginTop: 6,
     flexShrink: 0
   },

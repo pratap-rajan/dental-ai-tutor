@@ -12,7 +12,7 @@ export default function Footer() {
 
 const styles = {
   footer: {
-    background: theme.navy,
+    background: theme.pageBg,
     padding: "2.5rem 1.5rem",
     textAlign: "center",
     borderTop: `1px solid ${theme.navyLighter}`,

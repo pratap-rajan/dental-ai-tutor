@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import Header from "./Header.jsx";
 import Hero from "./Hero.jsx";
-import Features from "./Features.jsx";
 import HowItWorks from "./HowItWorks.jsx";
 import UploadForm from "./UploadForm.jsx";
 import Confirmation from "./Confirmation.jsx";
@@ -16,10 +15,9 @@ export default function App() {
   }
 
   return (
-    <div style={{ background: "#293039" }}>
+    <div style={{ background: "#04070f" }}>
       <Header onCtaClick={scrollToForm} />
       <Hero onCtaClick={scrollToForm} />
-      <Features />
       <HowItWorks />
       {submission ? (
         <Confirmation submission={submission} onReset={() => setSubmission(null)} />

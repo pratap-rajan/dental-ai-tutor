@@ -12,6 +12,8 @@ export default function Confirmation({ submission, onReset }) {
   return (
     <section style={styles.section}>
       <div style={styles.card}>
+        <div style={styles.backlight} />
+
         <div style={styles.iconCircle}>
           <CheckIcon />
         </div>
@@ -42,19 +44,19 @@ function Step({ done, inProgress, label }) {
   return (
     <div style={styles.stepRow}>
       {done ? (
-        <span style={{ ...styles.stepIcon, color: theme.success }}>
+        <span style={{ ...styles.stepIcon, color: theme.ctaMint }}>
           <CheckIcon size={17} />
         </span>
       ) : inProgress ? (
-        <span style={{ ...styles.stepIcon, color: theme.teal }}>
+        <span style={{ ...styles.stepIcon, color: theme.tealGlow }}>
           <SpinIcon />
         </span>
       ) : (
-        <span style={{ ...styles.stepIcon, color: theme.border }}>
+        <span style={{ ...styles.stepIcon, color: theme.navyLighter }}>
           <DashedIcon />
         </span>
       )}
-      <span style={{ fontSize: 15, color: done || inProgress ? theme.ink : theme.slateLight }}>
+      <span style={{ fontSize: 14.5, color: done || inProgress ? theme.white : theme.slateLight }}>
         {label}
       </span>
     </div>
@@ -87,50 +89,71 @@ function DashedIcon() {
 }
 
 const styles = {
-  section: { background: theme.white, padding: "4rem 1.5rem", fontFamily: fonts.body },
+  section: {
+    background: [
+      `radial-gradient(ellipse 700px 400px at 90% 10%, rgba(99,209,230,0.14), transparent 55%)`,
+      `radial-gradient(ellipse 700px 450px at 5% 90%, rgba(162,143,243,0.14), transparent 55%)`,
+      theme.pageBg
+    ].join(", "),
+    padding: "4rem 1.5rem",
+    fontFamily: fonts.body
+  },
   card: {
+    position: "relative",
+    overflow: "hidden",
     maxWidth: 480,
     margin: "0 auto",
-    background: theme.surface,
+    background: "#0d1021",
     borderRadius: 16,
-    border: `1px solid ${theme.border}`,
+    border: `1px solid ${theme.ctaMint}55`,
+    boxShadow: `0 0 0 1px ${theme.ctaMint}22, 0 0 60px -10px ${theme.tealGlow}66, 0 16px 40px rgba(0,0,0,0.4)`,
     padding: "2rem",
     textAlign: "center"
   },
+  backlight: {
+    position: "absolute",
+    inset: 0,
+    pointerEvents: "none",
+    background: `radial-gradient(circle at 30% 10%, ${theme.tealGlow}22, transparent 60%)`
+  },
   iconCircle: {
+    position: "relative",
     width: 52,
     height: 52,
     borderRadius: "50%",
-    background: theme.successBg,
-    color: theme.success,
+    background: "rgba(114,212,196,0.14)",
+    color: theme.ctaMint,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     margin: "0 auto 1.1rem"
   },
-  title: { fontFamily: fonts.display, margin: "0 0 6px", fontSize: 20, fontWeight: 600, color: theme.ink },
-  subtitle: { fontSize: 15, color: theme.slate, margin: "0 0 1.4rem" },
+  title: { position: "relative", fontFamily: fonts.display, margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: theme.white },
+  subtitle: { position: "relative", fontSize: 14.5, color: theme.mint, opacity: 0.8, margin: "0 0 1.4rem" },
   stepBox: {
+    position: "relative",
     textAlign: "left",
-    background: theme.white,
-    border: `1px solid ${theme.border}`,
+    background: "rgba(255,255,255,0.02)",
+    border: `1px solid ${theme.navyLighter}`,
     borderRadius: 10,
     padding: "1.1rem",
     marginBottom: "1.4rem"
   },
   stepRow: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 },
   stepIcon: { display: "flex", alignItems: "center" },
-  note: { fontSize: 15, color: theme.slate, margin: "0 0 1.4rem", lineHeight: 1.6 },
-  emailHighlight: { color: theme.ink, fontWeight: 600 },
+  note: { position: "relative", fontSize: 14.5, color: theme.mint, opacity: 0.8, margin: "0 0 1.4rem", lineHeight: 1.6 },
+  emailHighlight: { color: theme.ctaMint, fontWeight: 700 },
   button: {
+    position: "relative",
     width: "100%",
     padding: "12px 0",
     borderRadius: 8,
-    border: `1px solid ${theme.border}`,
-    background: theme.white,
-    fontSize: 15,
-    fontWeight: 500,
+    border: `1px solid ${theme.navyLighter}`,
+    background: "rgba(255,255,255,0.03)",
+    fontSize: 14.5,
+    fontWeight: 600,
     cursor: "pointer",
-    color: theme.ink
+    color: theme.white,
+    fontFamily: fonts.body
   }
 };
