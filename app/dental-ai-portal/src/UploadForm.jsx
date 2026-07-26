@@ -117,9 +117,9 @@ export default function UploadForm({ onSubmitted, formRef }) {
               onChange={(e) => setCaseId(e.target.value)}
               disabled={submitting}
             >
-              <option value="">Select a case</option>
+              <option value="" style={styles.option}>Select a case</option>
               {CASE_CATALOG.map((c) => (
-                <option key={c.id} value={c.id}>{c.label}</option>
+                <option key={c.id} value={c.id} style={styles.option}>{c.label}</option>
               ))}
             </select>
           </div>
@@ -299,7 +299,12 @@ const styles = {
     boxSizing: "border-box",
     background: "rgba(255,255,255,0.03)",
     color: theme.white,
-    fontFamily: fonts.body
+    fontFamily: fonts.body,
+    colorScheme: "dark"
+  },
+  option: {
+    background: "#0d1021",
+    color: theme.white
   },
   toggleRow: { position: "relative", display: "flex", gap: 8 },
   toggle: {

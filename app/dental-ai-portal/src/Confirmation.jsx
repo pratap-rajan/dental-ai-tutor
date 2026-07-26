@@ -5,8 +5,15 @@ export default function Confirmation({ submission, onReset }) {
   const [stage, setStage] = useState(1);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStage(2), 4000);
-    return () => clearTimeout(t1);
+    // Purely cosmetic staged progress — the real completion signal is
+    // the email that eventually lands, not this component. These timers
+    // just avoid leaving the student staring at a spinner forever.
+    const t1 = setTimeout(() => setStage(2), 15000);  // ~15s: move to "Generating feedback"
+    const t2 = setTimeout(() => setStage(3), 60000);  // ~60s: settle into "done" state
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, []);
 
   return (
@@ -23,13 +30,23 @@ export default function Confirmation({ submission, onReset }) {
         <div style={styles.stepBox}>
           <Step done label="Recording uploaded" />
           <Step done={stage >= 2} inProgress={stage === 1} label="Transcribing your response" />
-          <Step done={false} inProgress={stage >= 2} label="Generating feedback" />
+          <Step done={stage >= 3} inProgress={stage === 2} label="Generating feedback" />
         </div>
 
         <p style={styles.note}>
-          We'll email your {submission.reportType} report to{" "}
-          <span style={styles.emailHighlight}>{submission.email}</span> within
-          a few minutes.
+          {stage >= 3 ? (
+            <>
+              Your {submission.reportType} report should be on its way to{" "}
+              <span style={styles.emailHighlight}>{submission.email}</span>.
+              Not seeing it? Check your spam folder, or get in touch with the academy.
+            </>
+          ) : (
+            <>
+              We'll email your {submission.reportType} report to{" "}
+              <span style={styles.emailHighlight}>{submission.email}</span> within
+              a few minutes.
+            </>
+          )}
         </p>
 
         <button style={styles.button} onClick={onReset}>
