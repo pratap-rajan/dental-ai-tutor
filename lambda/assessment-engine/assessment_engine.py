@@ -203,6 +203,110 @@ def clean_json_response(text):
     return text.strip()
 
 
+def check_case_relevance(case_study_text, marking_matrix, student_answer, image_base64=None):
+    """
+    Cheap, fast pre-check run BEFORE the full assessment call. Asks Claude
+    a single narrow question: does this student transcript actually
+    describe an attempt at THIS case's scenario, or is it a clearly
+    different clinical scenario (e.g. the wrong recording uploaded to the
+    wrong case)?
+
+    This is deliberately a separate call from the main scoring prompt —
+    folding this check into the scoring prompt is exactly what allowed
+    the original bug: the scoring prompt is designed to award partial
+    credit and note "missed" items, so a completely mismatched transcript
+    just reads as an extremely poor attempt rather than a wrong upload.
+    A dedicated relevance check has no scoring incentive and can say
+    "no" cleanly.
+
+    Returns a dict: {"relevant": bool, "reason": str}
+    """
+    check_prompt = f"""You are checking whether a student's spoken exam
+answer actually corresponds to a specific clinical case, before any
+scoring happens. This is a relevance check ONLY — do not evaluate
+quality, do not award marks, do not identify errors or omissions.
+
+CASE STUDY / SCENARIO
+{case_study_text if case_study_text else "(see attached image)"}
+
+MARKING MATRIX (topics this case is testing)
+{marking_matrix}
+
+STUDENT'S SPOKEN ANSWER (transcribed)
+{student_answer}
+
+Question: Does the student's answer describe an attempt to manage THIS
+specific clinical scenario — even if done poorly, incompletely, or with
+significant clinical errors? A poor or incomplete attempt at the RIGHT
+scenario should be marked relevant. Only mark it as NOT relevant if the
+transcript is clearly about a different clinical scenario entirely
+(e.g. a different presenting complaint, a different type of
+consultation, or unrelated content) — the kind of mismatch that would
+happen if a recording for a different case was uploaded by mistake.
+
+Return ONLY valid JSON in this exact shape, nothing else:
+{{
+  "relevant": true or false,
+  "reason": "one short sentence explaining the decision"
+}}
+"""
+
+    result_text = invoke_claude(check_prompt, image_base64=image_base64)
+    result = json.loads(clean_json_response(result_text))
+
+    return {
+        "relevant": bool(result.get("relevant", True)),
+        "reason": result.get("reason", "")
+    }
+
+
+def generate_rejection_report(case_id, reason):
+    """
+    Builds a short, honest HTML report for when the relevance check
+    fails — clearly explaining that this recording does not appear to
+    match the selected case, rather than presenting a misleading score.
+    """
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    body {{
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f8fafc; color: #1e293b; margin: 0; padding: 40px;
+    }}
+    .box {{
+        max-width: 640px; margin: 0 auto; background: #ffffff;
+        border: 1px solid #fecaca; border-left: 4px solid #dc2626;
+        border-radius: 8px; padding: 30px;
+    }}
+    h1 {{ font-size: 18pt; color: #991b1b; margin: 0 0 12px; }}
+    p {{ font-size: 11pt; line-height: 1.6; color: #334155; }}
+    .reason {{ background: #fef2f2; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 10.5pt; color: #7f1d1d; }}
+</style>
+</head>
+<body>
+    <div class="box">
+        <h1>Unable to Assess — Case Mismatch Detected</h1>
+        <p>
+            This recording could not be scored against <strong>{case_id}</strong>.
+            The content of the recording does not appear to match the
+            clinical scenario for this case.
+        </p>
+        <div class="reason">{reason}</div>
+        <p>
+            This usually happens when a recording is uploaded to the
+            wrong case. Please check which case this recording was
+            actually intended for and re-submit it under the correct
+            case selection.
+        </p>
+        <p>No score has been generated for this attempt.</p>
+    </div>
+</body>
+</html>
+"""
+
+
 def build_prompt(prompt_template, marking_matrix, reference_answer, student_answer, case_study=""):
     """
     Fills the prompt template loaded from S3 with the dynamic values.
@@ -588,6 +692,46 @@ def lambda_handler(event, context):
 
         reference_answer = extract_transcript(reference_json)
         student_answer   = extract_transcript(student_json)
+
+        #
+        # Relevance gate — reject outright if this transcript clearly
+        # doesn't match this case's scenario (e.g. wrong recording
+        # uploaded to the wrong case), BEFORE running the real scoring
+        # prompt. This is a separate, narrow check so it isn't subject
+        # to the scoring prompt's built-in leniency/partial-credit
+        # instructions, which is what let a mismatched case1/case3
+        # upload through as "Meets Standard" previously.
+        #
+
+        print("Running case-relevance check...")
+        relevance = check_case_relevance(
+            case_study_text,
+            marking_matrix,
+            student_answer,
+            image_base64=case_image_base64
+        )
+        print(f"Relevance check result: {relevance}")
+
+        if not relevance["relevant"]:
+            print(f"REJECTED — case mismatch detected: {relevance['reason']}")
+
+            report_key = f"reports/{case_id}/{file_prefix}-report.html"
+            html_report = generate_rejection_report(case_id, relevance["reason"])
+
+            write_s3_html(BUCKET_NAME, report_key, html_report)
+            send_report_email(case_id, file_prefix, html_report, email_id)
+
+            return {
+                "statusCode": 200,
+                "body": {
+                    "message":       "Rejected — case mismatch",
+                    "caseId":        case_id,
+                    "student":       file_prefix,
+                    "report_s3_key": report_key,
+                    "email_sent_to": email_id,
+                    "rejectionReason": relevance["reason"]
+                }
+            }
 
         #
         # Build prompt from S3 template
