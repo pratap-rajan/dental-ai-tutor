@@ -1,20 +1,31 @@
 import { useEffect, useState } from "react";
 import { theme, fonts } from "./theme.js";
 
+function stageForElapsed(elapsedMs) {
+  if (elapsedMs >= 200000) return 3;
+  if (elapsedMs >= 40000) return 2;
+  return 1;
+}
+
 export default function Confirmation({ submission, onReset }) {
-  const [stage, setStage] = useState(1);
+  const submittedAt = submission.submittedAt ?? Date.now();
+  const [stage, setStage] = useState(() => stageForElapsed(Date.now() - submittedAt));
 
   useEffect(() => {
     // Purely cosmetic staged progress — the real completion signal is
-    // the email that eventually lands, not this component. These timers
-    // just avoid leaving the student staring at a spinner forever.
-    const t1 = setTimeout(() => setStage(2), 15000);  // ~15s: move to "Generating feedback"
-    const t2 = setTimeout(() => setStage(3), 60000);  // ~60s: settle into "done" state
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
+    // the email that eventually lands, not this component. Stage is
+    // computed from real elapsed time since submission (not just time
+    // since this component mounted), so a page refresh resumes at the
+    // correct stage instead of restarting the timer — this is also
+    // what lets the "don't submit another while processing" cooldown
+    // survive a refresh.
+    const interval = setInterval(() => {
+      setStage(stageForElapsed(Date.now() - submittedAt));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [submittedAt]);
+
+  const canSubmitAnother = stage >= 3;
 
   return (
     <section style={styles.section}>
@@ -49,8 +60,20 @@ export default function Confirmation({ submission, onReset }) {
           )}
         </p>
 
-        <button style={styles.button} onClick={onReset}>
-          Submit another case
+        {!canSubmitAnother && (
+          <p style={styles.waitNote}>
+            Please wait for this submission to finish processing before
+            starting another one — this helps keep feedback flowing
+            smoothly for everyone.
+          </p>
+        )}
+
+        <button
+          style={canSubmitAnother ? styles.button : styles.buttonDisabled}
+          onClick={canSubmitAnother ? onReset : undefined}
+          disabled={!canSubmitAnother}
+        >
+          {canSubmitAnother ? "Submit another case" : "Please wait…"}
         </button>
       </div>
     </section>
@@ -159,6 +182,17 @@ const styles = {
   stepRow: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 },
   stepIcon: { display: "flex", alignItems: "center" },
   note: { position: "relative", fontSize: 14.5, color: theme.mint, opacity: 0.8, margin: "0 0 1.4rem", lineHeight: 1.6 },
+  waitNote: {
+    position: "relative",
+    fontSize: 13,
+    color: theme.accentPurple,
+    background: "rgba(162,143,243,0.08)",
+    border: `1px solid ${theme.accentPurple}44`,
+    borderRadius: 8,
+    padding: "10px 14px",
+    margin: "0 0 1rem",
+    lineHeight: 1.5
+  },
   emailHighlight: { color: theme.ctaMint, fontWeight: 700 },
   button: {
     position: "relative",
@@ -172,5 +206,19 @@ const styles = {
     cursor: "pointer",
     color: theme.white,
     fontFamily: fonts.body
+  },
+  buttonDisabled: {
+    position: "relative",
+    width: "100%",
+    padding: "12px 0",
+    borderRadius: 8,
+    border: `1px solid ${theme.navyLighter}`,
+    background: "rgba(255,255,255,0.015)",
+    fontSize: 14.5,
+    fontWeight: 600,
+    cursor: "not-allowed",
+    color: theme.slateLight,
+    fontFamily: fonts.body,
+    opacity: 0.6
   }
 };
