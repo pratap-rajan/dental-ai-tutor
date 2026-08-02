@@ -20,6 +20,7 @@
 - [Case Configuration](#-case-configuration)
 - [Upload Flow](#-upload-flow)
 - [Transcription Flow](#-transcription-flow)
+- [Recording Cleanup Flow](#️-recording-cleanup-flow)
 - [Assessment Flow](#-assessment-flow)
 - [Example Assessment Output](#-example-assessment-output)
 - [Report Generation](#-report-generation)
@@ -53,6 +54,7 @@ The platform:
 5. Generates an examiner-style score, grade, strengths, and areas for improvement.
 6. Stores the report in Amazon S3.
 7. Emails the report to the student — either the address they typed into the portal, or a default academy address for manually-triggered runs.
+8. Deletes the original recording once transcription is confirmed complete — only the transcript, metadata, and report are retained, in line with the platform's Terms & Conditions.
 
 ---
 
@@ -90,6 +92,7 @@ This README previously described the target architecture. As of the latest deplo
 | Presigned-URL Lambda + API Gateway | ✅ Live |
 | Per-student metadata sidecar (email/report type survive the async Transcribe hop) | ✅ Live |
 | Email delivery via **Amazon SES** (not SNS) | ✅ Live |
+| Automatic recording deletion after successful transcription (T&C compliance) | ✅ Live — EventBridge Rule 3 |
 | PDF reports | ❌ Not built — HTML only |
 | Cognito auth / faculty dashboard / DynamoDB | ❌ Not built — see [Roadmap](#️-roadmap) |
 | Bedrock Knowledge Base / RAG | ❌ Deliberately not planned yet — see [Roadmap](#️-roadmap) |
@@ -135,6 +138,10 @@ SES[Amazon SES]
 
 Email[Student Email]
 
+EB3[EventBridge Rule 3]
+
+CleanupLambda[Recording Cleanup Lambda]
+
 Student --> Portal
 Portal --> APIGW
 APIGW --> PresignLambda
@@ -145,6 +152,10 @@ UploadBucket --> EB1
 EB1 --> TranscribeLambda
 TranscribeLambda --> Transcribe
 Transcribe --> TranscriptBucket
+
+Transcribe --> EB3
+EB3 --> CleanupLambda
+CleanupLambda -->|deletes mp4 after COMPLETED| UploadBucket
 
 TranscriptBucket --> EB2
 EB2 --> AssessmentLambda
@@ -171,6 +182,7 @@ participant S3
 participant EventBridge
 participant TranscribeLambda
 participant Transcribe
+participant CleanupLambda
 participant AssessmentLambda
 participant Bedrock
 participant SES
@@ -187,6 +199,10 @@ S3->>EventBridge: Object Created (student-uploads/)
 EventBridge->>TranscribeLambda: Invoke
 TranscribeLambda->>Transcribe: Start Job
 Transcribe-->>S3: Write transcript JSON
+
+Transcribe->>EventBridge: Job State Change (COMPLETED)
+EventBridge->>CleanupLambda: Invoke
+CleanupLambda->>S3: Delete original mp4
 
 S3->>EventBridge: Object Created (transcripts/)
 EventBridge->>AssessmentLambda: Invoke
@@ -242,7 +258,7 @@ Every case supplies its own `prompt-template.txt`, so the examiner persona, scor
 |---|---|
 | Amazon S3 | File storage — case assets, uploads, transcripts, reports, metadata sidecars |
 | Amazon EventBridge | Event routing between upload → transcribe → assessment stages |
-| AWS Lambda | Serverless processing (4 functions — see below) |
+| AWS Lambda | Serverless processing (5 functions — see below) |
 | Amazon Transcribe | Speech-to-text |
 | Amazon Bedrock | AI evaluation (Claude) |
 | Amazon SES | HTML email delivery with report attachment |
@@ -259,6 +275,7 @@ Every case supplies its own `prompt-template.txt`, so the examiner persona, scor
 | `assessment-transcribe` | Starts a Transcribe job when an mp4 lands in `student-uploads/` (name is historical — it only handles transcription, not assessment) |
 | `dental-ai-assessment` | Loads case assets, calls Bedrock, generates the HTML report, emails it via SES |
 | `presigned-upload-url` | Fronts the React portal — issues a scoped S3 PUT URL and writes the metadata sidecar |
+| `delete-processed-recording` | Deletes the original mp4 from `student-uploads/` once its Transcribe job reports `COMPLETED` — required for T&C compliance (recordings are not retained after transcription; the transcript and metadata sidecar are) |
 
 ---
 
@@ -294,7 +311,10 @@ dental-ai-tutor/
 │   ├── assessment-engine/
 │   │   └── lambda_function.py
 │   │
-│   └── presigned-upload-url/
+│   ├── presigned-upload-url/
+│   │   └── lambda_function.py
+│   │
+│   └── delete-processed-recording/
 │       └── lambda_function.py
 │
 ├── docs/
@@ -335,8 +355,8 @@ cases/
 student-uploads/
 │
 ├── case1-amalgam-highspot/
-│   ├── janedoe-1784980001.mp4
-│   └── janedoe-1784980001.metadata.json   ← { emailId, reportType }, written at upload time
+│   ├── janedoe-1784980001.mp4             ← transient — deleted after successful transcription
+│   └── janedoe-1784980001.metadata.json   ← { emailId, reportType }, written at upload time, retained
 │
 transcripts/
 │
@@ -393,6 +413,32 @@ Responsibilities:
 - Write the resulting transcript to `transcripts/{caseId}/{studentName}.json`
 
 A DLQ (`eventbridge-transcribe-dlq`) is attached to this rule's target so a failed EventBridge→Lambda invocation captures the original event payload instead of failing silently.
+
+---
+
+# 🗑️ Recording Cleanup Flow
+
+`delete-processed-recording` Lambda, triggered by **EventBridge Rule 3** — separate from Rules 1 and 2, since it listens to a different event source entirely (Amazon Transcribe's own job-status events, not an S3 object-creation event):
+
+**Event pattern:**
+```json
+{
+  "source": ["aws.transcribe"],
+  "detail-type": ["Transcribe Job State Change"],
+  "detail": {
+    "TranscriptionJobStatus": ["COMPLETED"]
+  }
+}
+```
+
+Responsibilities:
+- Fires only when a Transcribe job reports `COMPLETED` — never on `FAILED` or `IN_PROGRESS`, so a source recording is never deleted before a failed job can be investigated or retried
+- Reconstructs the original mp4's S3 key from the Transcribe job name (`{caseId}-{studentName}-{timestamp}`), rather than deleting "the newest file in the folder" — the job name is split from the right (dropping the trailing timestamp), then the remaining segments are tested against real `cases/{candidate}/` folders in S3 to find the correct `caseId`/`studentName` split, since both can themselves contain hyphens
+- Deletes only the exact reconstructed `student-uploads/{caseId}/{studentName}.mp4` key
+- Never touches the metadata sidecar (`.metadata.json`) or the transcript in `transcripts/` — only the mp4 is deleted, matching the platform's Terms & Conditions (recordings are not retained after transcription; the transcript and a small metadata record are)
+- Fails safe: if the job name can't be confidently parsed, or the target file no longer exists, it logs and exits without error rather than risking an incorrect deletion
+
+This is why the T&C can state that recordings are deleted after transcription while transcripts and reports remain available — the deletion is enforced automatically by this rule, not a manual/occasional cleanup step.
 
 ---
 
@@ -513,8 +559,10 @@ applications:
 4. Create EventBridge Rule 1 — `Object Created`, prefix `student-uploads/` → invoke `assessment-transcribe`
 5. Deploy `dental-ai-assessment` (Assessment Lambda) with `BUCKET_NAME`, `MODEL_ID`, `REGION`, `SES_SENDER`, `DEFAULT_NOTIFY_EMAIL`, `DEFAULT_REPORT_TYPE` env vars
 6. Create EventBridge Rule 2 — `Object Created`, wildcard `transcripts/*.json` → invoke `dental-ai-assessment`
-7. Verify a sender identity in SES (and request production access before real students use it)
-8. (Recommended) attach an SQS DLQ to both rules' targets
+7. Deploy `delete-processed-recording` with `BUCKET_NAME`, `REGION`, `INPUT_PREFIX` env vars and IAM permissions for `s3:DeleteObject`, `s3:GetObject`, `s3:ListBucket` scoped to `student-uploads/*` and `cases/*`
+8. Create EventBridge Rule 3 — `source: aws.transcribe`, `detail-type: Transcribe Job State Change`, `TranscriptionJobStatus: COMPLETED` → invoke `delete-processed-recording`
+9. Verify a sender identity in SES (and request production access before real students use it)
+10. (Recommended) attach an SQS DLQ to all three rules' targets
 
 ## Frontend (React portal)
 
@@ -545,8 +593,12 @@ Upload a real mp4 through the live portal and confirm a report email arrives —
 ## `presigned-upload-url`
 - `s3:PutObject` scoped to `student-uploads/*`
 
+## `delete-processed-recording`
+- `s3:DeleteObject`, `s3:GetObject` scoped to `student-uploads/*`
+- `s3:ListBucket` scoped (via condition) to `cases/*` and `student-uploads/*` prefixes only — used to confirm a candidate `caseId` is real while parsing the Transcribe job name
+
 ## EventBridge rule execution roles
-- `lambda:InvokeFunction` scoped to the specific target Lambda's ARN
+- `lambda:InvokeFunction` scoped to the specific target Lambda's ARN (three rules → three grants, one per target)
 
 ---
 
@@ -606,7 +658,8 @@ A few non-obvious things worth remembering, surfaced during the build:
 - HTML reports (detailed/basic)
 - Email delivery via SES
 - React portal, deployed on Amplify
-- Fully automated EventBridge pipeline
+- Fully automated EventBridge pipeline (3 rules: upload → transcribe, transcript → assess, transcription complete → delete recording)
+- Automatic recording deletion post-transcription, for T&C compliance
 
 ## Phase 2 — Scaling content (current focus)
 - Grow from 3 cases toward the full 300-case ORE & LDS library
