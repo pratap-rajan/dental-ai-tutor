@@ -25,8 +25,19 @@ export const CASE_CATALOG = [
   {
     id: "case3-avulsed-tooth",
     label: "Case 3 — Avulsed tooth (telephone triage)"
+  },
+  {
+    id: "case4-bleeding",
+    label: "Case 4 — Post-extraction bleeding"
   }
 ];
 
 // Max upload size, matches whatever limit you enforce server-side too.
 export const MAX_FILE_SIZE_MB = 200;
+
+// Google reCAPTCHA v3 site key. Get this from
+// https://www.google.com/recaptcha/admin — register a v3 site for
+// your Amplify domain. Leave as "" to disable CAPTCHA entirely (e.g.
+// for local development) — the form and backend both treat an empty
+// key as "no CAPTCHA required".
+export const RECAPTCHA_SITE_KEY = "";
