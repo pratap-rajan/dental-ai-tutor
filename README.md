@@ -104,7 +104,7 @@ A few things differ from the original design on purpose:
 
 # 🏗️ End-to-End Architecture
 
-```
+```mermaid
 flowchart TB
 
 Student[Student — via React Portal or direct S3 upload]
@@ -155,13 +155,12 @@ AssessmentLambda --> SES
 SES --> Email
 ```
 
-    Loading
 
 ---
 
 # 🔄 Sequence Diagram
 
-```
+```mermaid
 sequenceDiagram
 
 participant Student
@@ -199,13 +198,12 @@ AssessmentLambda->>SES: Send email with report attached
 SES-->>Student: Report delivered
 ```
 
-    Loading
 
 ---
 
 # 🧠 Assessment Pipeline
 
-```
+```mermaid
 flowchart LR
 
 CaseStudy[Case Study — image or text]
@@ -233,7 +231,6 @@ Assessment --> HTML
 Metadata --> HTML
 ```
 
-    Loading
 
 Every case supplies its own `prompt-template.txt`, so the examiner persona, scoring philosophy, deduplication rules, and sample output format can all differ per case with **no Lambda code changes** — the Lambda only ever loads whatever `cases/{caseId}/` contains.
 
