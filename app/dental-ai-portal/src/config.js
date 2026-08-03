@@ -29,6 +29,10 @@ export const CASE_CATALOG = [
   {
     id: "case4-bleeding",
     label: "Case 4 — Post-extraction bleeding"
+  },
+  {
+    id: "case5-bisphosphonates",
+    label: "Case 5 — Bisphosphonates & ONJ risk"
   }
 ];
 
