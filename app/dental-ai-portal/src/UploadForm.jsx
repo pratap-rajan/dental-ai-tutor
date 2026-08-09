@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { CASE_CATALOG, MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, RECAPTCHA_SITE_KEY } from "./config.js";
 import { requestUploadUrl, uploadFileToS3 } from "./api.js";
 import { theme, fonts } from "./theme.js";
-import CaseSelect from "./CaseSelect.jsx";
+import CaseSelect from "./caseselect.jsx";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
