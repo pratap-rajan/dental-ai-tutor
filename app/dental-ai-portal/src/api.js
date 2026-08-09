@@ -2,25 +2,34 @@ import { API_BASE_URL } from "./config.js";
 
 /**
  * Asks the backend for a presigned S3 PUT URL, scoped to
- * student-uploads/{caseId}/{studentFileName}.mp4
+ * student-uploads/{caseId}/{studentFileName}.{ext} — ext is whatever
+ * extension the uploaded file actually has (mp4, ogg, or wav).
  *
  * Expected backend contract (your presigned-URL Lambda, fronted by
  * API Gateway):
  *
  *   POST {API_BASE_URL}/upload-url
- *   body: { caseId, email, fileName, contentType }
+ *   body: { caseId, email, fileName, contentType, reportType, captchaToken }
  *
  *   response: { uploadUrl, objectKey }
  *
  * uploadUrl is a presigned S3 PUT URL valid for a short time (e.g. 5 min).
  * objectKey is the final S3 key the file will land at — useful for
  * showing the student a reference, or for your own logging.
+ *
+ * captchaToken is a reCAPTCHA v3 token generated client-side just before
+ * submit. It MUST be verified server-side (in the Lambda) against
+ * Google's siteverify endpoint before issuing a presigned URL — a
+ * client-side-only check does nothing to stop a bot, since a bot can
+ * simply skip calling grecaptcha.execute() and call this endpoint
+ * directly. If RECAPTCHA_SITE_KEY is unset in config.js, captchaToken
+ * will be null and the backend should treat CAPTCHA as disabled.
  */
-export async function requestUploadUrl({ caseId, email, fileName, contentType }) {
+export async function requestUploadUrl({ caseId, email, fileName, contentType, reportType, captchaToken }) {
   const response = await fetch(`${API_BASE_URL}/upload-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ caseId, email, fileName, contentType })
+    body: JSON.stringify({ caseId, email, fileName, contentType, reportType, captchaToken })
   });
 
   if (!response.ok) {
@@ -41,7 +50,7 @@ export function uploadFileToS3(uploadUrl, file, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", uploadUrl);
-    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {

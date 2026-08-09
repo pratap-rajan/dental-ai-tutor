@@ -43,6 +43,14 @@ export const CASE_CATALOG = [
 // Max upload size, matches whatever limit you enforce server-side too.
 export const MAX_FILE_SIZE_MB = 200;
 
+// Recording formats accepted end-to-end. Must stay in sync with
+// ALLOWED_EXTENSIONS in presigned_url_lambda.py and MEDIA_FORMATS in
+// transcribe_trigger_lambda.py — Amazon Transcribe supports all three
+// natively for batch jobs, so adding a new one here just needs the
+// matching addition on both Lambdas (and the delete-processed-recording
+// Lambda's ALLOWED_EXTENSIONS, so cleanup can still find the file).
+export const ALLOWED_EXTENSIONS = ["mp4", "ogg", "wav"];
+
 // Google reCAPTCHA v3 site key. Get this from
 // https://www.google.com/recaptcha/admin — register a v3 site for
 // your Amplify domain. Leave as "" to disable CAPTCHA entirely (e.g.

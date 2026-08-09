@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { CASE_CATALOG, MAX_FILE_SIZE_MB, RECAPTCHA_SITE_KEY } from "./config.js";
+import { CASE_CATALOG, MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, RECAPTCHA_SITE_KEY } from "./config.js";
 import { requestUploadUrl, uploadFileToS3 } from "./api.js";
 import { theme, fonts } from "./theme.js";
-import CaseSelect from "./caseselect.jsx";
+import CaseSelect from "./CaseSelect.jsx";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -50,7 +50,11 @@ export default function UploadForm({ onSubmitted, formRef }) {
     if (!caseId) return "Select a case to continue.";
     if (!email || !EMAIL_PATTERN.test(email)) return "Enter a valid email address.";
     if (!file) return "Add a recording to continue.";
-    if (!file.name.toLowerCase().endsWith(".mp4")) return "Only MP4 recordings are supported.";
+    const extension = file.name.toLowerCase().split(".").pop();
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      const allowedList = ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(", ");
+      return `Unsupported file type. Allowed formats: ${allowedList}.`;
+    }
     if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
       return `That file is too large. Keep it under ${MAX_FILE_SIZE_MB}MB.`;
     }
@@ -204,7 +208,7 @@ export default function UploadForm({ onSubmitted, formRef }) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="video/mp4,.mp4"
+              accept="video/mp4,.mp4,audio/ogg,.ogg,audio/wav,.wav"
               style={{ display: "none" }}
               onChange={(e) => handleFileChange(e.target.files?.[0])}
               disabled={submitting}
@@ -215,7 +219,7 @@ export default function UploadForm({ onSubmitted, formRef }) {
             ) : (
               <>
                 <p style={styles.dropText}>Drag your recording here or browse</p>
-                <p style={styles.dropHint}>MP4, up to {MAX_FILE_SIZE_MB}MB</p>
+                <p style={styles.dropHint}>MP4, OGG, or WAV — up to {MAX_FILE_SIZE_MB}MB</p>
               </>
             )}
           </div>
