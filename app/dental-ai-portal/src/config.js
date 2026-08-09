@@ -41,6 +41,18 @@ export const CASE_CATALOG = [
   {
     id: "case7-oac",
     label: "Case 7 — Oro-antral communication"
+  },
+  {
+    id: "case8-denture-hygiene-advice",
+    label: "Case 8 — Denture hygiene advice"
+  },
+  {
+    id: "case9-dietary-advice",
+    label: "Case 9 — Dietary advice"
+  },
+  {
+    id: "case10-dry-mouth",
+    label: "Case 10 — Dry mouth"
   }
 ];
 
