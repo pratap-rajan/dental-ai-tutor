@@ -35,13 +35,13 @@ export const CASE_CATALOG = [
     label: "Case 5 — Bisphosphonates & ONJ risk"
   },
   {
-    id: "case6-consent",
+    id: "case6-consent-extraction",
     label: "Case 6 — Consent for extraction of upper molar"
   }
 ];
 
 // Max upload size, matches whatever limit you enforce server-side too.
-export const MAX_FILE_SIZE_MB = 200;
+export const MAX_FILE_SIZE_MB = 100;
 
 // Recording formats accepted end-to-end. Must stay in sync with
 // ALLOWED_EXTENSIONS in presigned_url_lambda.py and MEDIA_FORMATS in
