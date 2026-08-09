@@ -19,8 +19,8 @@ const STEPS = [
   {
     n: "03",
     title: "Get structured feedback",
-    body: "Receive an examiner-style scorecard by email — what you got right, what to improve, and how.",
-    tags: ["Detailed report"],
+    body: "Receive an examiner-style scorecard by email (Basic & Detailed) — what you got right, what to improve, and how.",
+    tags: ["Detailed report", "Basic Report"],
     accent: theme.ctaMint
   }
 ];
