@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
-import { CASE_CATALOG, MAX_FILE_SIZE_MB } from "./config.js";
+import { useState, useRef, useEffect } from "react";
+import { CASE_CATALOG, MAX_FILE_SIZE_MB, RECAPTCHA_SITE_KEY } from "./config.js";
 import { requestUploadUrl, uploadFileToS3 } from "./api.js";
 import { theme, fonts } from "./theme.js";
+import CaseSelect from "./caseselect.jsx";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,6 +17,34 @@ export default function UploadForm({ onSubmitted, formRef }) {
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef(null);
+
+  // Load the reCAPTCHA v3 script once, on mount. v3 is invisible — no
+  // checkbox, no puzzle — it silently scores each interaction and we
+  // fetch a fresh token right before submit. The actual score check
+  // happens server-side (in the presigned-URL Lambda), since a bot can
+  // trivially skip any check that only happens in the browser.
+  useEffect(() => {
+    if (!RECAPTCHA_SITE_KEY) return;
+    if (document.getElementById("recaptcha-script")) return;
+
+    const script = document.createElement("script");
+    script.id = "recaptcha-script";
+    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
+    script.async = true;
+    document.head.appendChild(script);
+  }, []);
+
+  async function getCaptchaToken() {
+    if (!RECAPTCHA_SITE_KEY || !window.grecaptcha) return null;
+    return new Promise((resolve) => {
+      window.grecaptcha.ready(() => {
+        window.grecaptcha
+          .execute(RECAPTCHA_SITE_KEY, { action: "submit_case" })
+          .then(resolve)
+          .catch(() => resolve(null));
+      });
+    });
+  }
 
   function validate() {
     if (!caseId) return "Select a case to continue.";
@@ -53,11 +82,19 @@ export default function UploadForm({ onSubmitted, formRef }) {
     setProgress(0);
 
     try {
+      const captchaToken = await getCaptchaToken();
+
+      if (RECAPTCHA_SITE_KEY && !captchaToken) {
+        throw new Error("Could not verify you're human. Please try again.");
+      }
+
       const { uploadUrl, objectKey } = await requestUploadUrl({
         caseId,
         email,
         fileName: file.name,
-        contentType: file.type || "video/mp4"
+        contentType: file.type || "video/mp4",
+        reportType,
+        captchaToken
       });
 
       await uploadFileToS3(uploadUrl, file, setProgress);
@@ -110,18 +147,12 @@ export default function UploadForm({ onSubmitted, formRef }) {
 
           <div style={styles.field}>
             <label style={styles.label} htmlFor="case-select">Case</label>
-            <select
-              id="case-select"
-              style={styles.input}
+            <CaseSelect
+              options={CASE_CATALOG}
               value={caseId}
-              onChange={(e) => setCaseId(e.target.value)}
+              onChange={setCaseId}
               disabled={submitting}
-            >
-              <option value="" style={styles.option}>Select a case</option>
-              {CASE_CATALOG.map((c) => (
-                <option key={c.id} value={c.id} style={styles.option}>{c.label}</option>
-              ))}
-            </select>
+            />
           </div>
 
           <div style={styles.field}>
@@ -215,6 +246,15 @@ export default function UploadForm({ onSubmitted, formRef }) {
               "Submit for feedback"
             )}
           </button>
+
+          {RECAPTCHA_SITE_KEY && (
+            <p style={styles.captchaNotice}>
+              Protected by reCAPTCHA —{" "}
+              <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" style={styles.captchaLink}>Privacy</a>
+              {" · "}
+              <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" style={styles.captchaLink}>Terms</a>
+            </p>
+          )}
         </form>
       </div>
     </section>
@@ -391,5 +431,16 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8
+  },
+  captchaNotice: {
+    position: "relative",
+    fontSize: 11,
+    color: theme.slateLight,
+    textAlign: "center",
+    margin: "0.75rem 0 0"
+  },
+  captchaLink: {
+    color: theme.slateLight,
+    textDecoration: "underline"
   }
 };

@@ -33,6 +33,10 @@ export const CASE_CATALOG = [
   {
     id: "case5-bisphosphonates",
     label: "Case 5 — Bisphosphonates & ONJ risk"
+  },
+  {
+    id: "case6-consent",
+    label: "Case 6 — Consent for extraction of upper molar"
   }
 ];
 
