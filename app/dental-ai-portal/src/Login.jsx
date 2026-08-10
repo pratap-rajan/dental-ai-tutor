@@ -34,7 +34,14 @@ export default function Login({ pendingApproval, authError }) {
 
   return (
     <div style={styles.page}>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", width: "100%", maxWidth: 820, justifyContent: "center" }}>
+      <div style={styles.stack}>
+        <TermsPanel
+          expanded={tcPanelOpen}
+          accepted={tcAccepted}
+          onToggleExpand={() => setTcPanelOpen((v) => !v)}
+          onAgree={() => { setTcAccepted(true); setTcPanelOpen(false); }}
+        />
+
         <div style={styles.card}>
           <div style={styles.iconBadge}>
             <i className="ti ti-tooth" style={{ color: theme.tealGlow, fontSize: 20 }} />
@@ -95,49 +102,56 @@ export default function Login({ pendingApproval, authError }) {
           </div>
           <p style={styles.tcHint}>Required to sign in</p>
         </div>
-
-        {tcPanelOpen && <TermsPanel onAgree={() => { setTcAccepted(true); setTcPanelOpen(false); }} onClose={() => setTcPanelOpen(false)} />}
       </div>
     </div>
   );
 }
 
-function TermsPanel({ onAgree, onClose }) {
+function TermsPanel({ expanded, accepted, onToggleExpand, onAgree }) {
   return (
     <div style={styles.tcPanel}>
-      <div style={styles.tcPanelHeader}>
+      <button style={styles.tcPanelHeader} onClick={onToggleExpand}>
         <i className="ti ti-file-text" style={{ color: theme.purpleGlow, fontSize: 17 }} />
         <p style={styles.tcPanelTitle}>Terms and Conditions</p>
-        <button onClick={onClose} aria-label="Close" style={styles.tcPanelClose}>
-          <i className="ti ti-x" style={{ fontSize: 16 }} />
-        </button>
-      </div>
-      <div style={styles.tcPanelBody}>
-        <TcSection n="1" title="What we collect and why">
-          Your name, email, your practice recording, and the case selected — used solely to generate examiner-style feedback against the relevant marking criteria.
-        </TcSection>
-        <TcSection n="2" title="How your recording is processed">
-          Your recording is transcribed to text, then assessed using Anthropic's Claude (Sonnet) via Amazon Bedrock, against your case's official marking matrix. All processing takes place in the UK AWS region, even if you submit from outside the UK.
-        </TcSection>
-        <TcSection n="3" title="What we keep, and for how long">
-          Your original recording is deleted once your assessment is generated. The text transcript, a small metadata record, and your report are retained so your feedback history stays available. You can request deletion at any time.
-        </TcSection>
-        <TcSection n="4" title="Where your data is stored">
-          Secure, encrypted AWS cloud infrastructure, UK region, with industry-standard access controls.
-        </TcSection>
-        <TcSection n="5" title="Who sees your data">
-          Not shared with third parties for their own purposes. Processed only by automated systems, and by AWS and Anthropic strictly as needed to run this service.
-        </TcSection>
-        <TcSection n="6" title="Accuracy and limitations">
-          AI-generated feedback supports exam preparation only and is not an official result. Always refer to your course provider's official guidance.
-        </TcSection>
-      </div>
-      <div style={styles.tcPanelFooter}>
-        <button onClick={onAgree} style={styles.tcAgreeButton}>
-          <i className="ti ti-check" style={{ fontSize: 15 }} />
-          I agree
-        </button>
-      </div>
+        {accepted && !expanded && (
+          <span style={styles.acceptedBadge}>
+            <i className="ti ti-check" style={{ fontSize: 12 }} />
+            Accepted
+          </span>
+        )}
+        <i className={`ti ti-chevron-${expanded ? "up" : "down"}`} style={{ color: theme.slateLight, fontSize: 16 }} />
+      </button>
+
+      {expanded && (
+        <>
+          <div style={styles.tcPanelBody}>
+            <TcSection n="1" title="What we collect and why">
+              Your name, email, your practice recording, and the case selected — used solely to generate examiner-style feedback against the relevant marking criteria.
+            </TcSection>
+            <TcSection n="2" title="How your recording is processed">
+              Your recording is transcribed to text, then assessed using Anthropic's Claude (Sonnet) via Amazon Bedrock, against your case's official marking matrix. All processing takes place in the UK AWS region, even if you submit from outside the UK.
+            </TcSection>
+            <TcSection n="3" title="What we keep, and for how long">
+              Your original recording is deleted once your assessment is generated. The text transcript, a small metadata record, and your report are retained so your feedback history stays available. You can request deletion at any time.
+            </TcSection>
+            <TcSection n="4" title="Where your data is stored">
+              Secure, encrypted AWS cloud infrastructure, UK region, with industry-standard access controls.
+            </TcSection>
+            <TcSection n="5" title="Who sees your data">
+              Not shared with third parties for their own purposes. Processed only by automated systems, and by AWS and Anthropic strictly as needed to run this service.
+            </TcSection>
+            <TcSection n="6" title="Accuracy and limitations">
+              AI-generated feedback supports exam preparation only and is not an official result. Always refer to your course provider's official guidance.
+            </TcSection>
+          </div>
+          <div style={styles.tcPanelFooter}>
+            <button onClick={onAgree} style={styles.tcAgreeButton}>
+              <i className="ti ti-check" style={{ fontSize: 15 }} />
+              I agree
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -183,9 +197,15 @@ const styles = {
     padding: "40px 16px",
     fontFamily: fonts.body
   },
+  stack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+    width: "100%",
+    maxWidth: 400
+  },
   card: {
     width: "100%",
-    maxWidth: 400,
     background: "#0d1021",
     border: `1px solid ${theme.navyLighter}`,
     borderRadius: 16,
@@ -220,13 +240,20 @@ const styles = {
   tcLink: { color: theme.lime, textDecoration: "underline", cursor: "pointer" },
   tcHint: { color: "#6b7280", fontSize: 10.5, margin: "0 0 0 25px" },
   tcPanel: {
-    width: "100%", maxWidth: 380, background: "#0d1021", border: `1px solid ${theme.navyLighter}`,
-    borderRadius: 16, display: "flex", flexDirection: "column", maxHeight: 520
+    width: "100%", background: "#0d1021", border: `1px solid ${theme.navyLighter}`,
+    borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden"
   },
-  tcPanelHeader: { padding: "16px 20px", borderBottom: `1px solid ${theme.navyLighter}`, display: "flex", alignItems: "center", gap: 9 },
-  tcPanelTitle: { color: "#fff", fontSize: 13.5, fontWeight: 500, margin: 0, flex: 1 },
-  tcPanelClose: { background: "none", border: "none", color: theme.slateLight, cursor: "pointer", padding: 4 },
-  tcPanelBody: { flex: 1, overflowY: "auto", padding: "16px 20px" },
+  tcPanelHeader: {
+    width: "100%", padding: "16px 20px", border: "none", background: "none", cursor: "pointer",
+    display: "flex", alignItems: "center", gap: 9, fontFamily: fonts.body
+  },
+  tcPanelTitle: { color: "#fff", fontSize: 13.5, fontWeight: 500, margin: 0, flex: 1, textAlign: "left" },
+  acceptedBadge: {
+    display: "flex", alignItems: "center", gap: 4,
+    background: "#72d4c422", color: theme.ctaMint, fontSize: 11, fontWeight: 500,
+    padding: "3px 8px", borderRadius: 20
+  },
+  tcPanelBody: { maxHeight: 320, overflowY: "auto", padding: "0 20px 16px", borderTop: `1px solid ${theme.navyLighter}` },
   tcPanelFooter: { padding: "12px 20px", borderTop: `1px solid ${theme.navyLighter}` },
   tcAgreeButton: {
     width: "100%", background: theme.navyLighter, border: `1px solid ${theme.lime}`, color: theme.lime,
