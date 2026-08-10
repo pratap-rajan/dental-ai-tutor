@@ -1,0 +1,6 @@
+# Disallow all well-behaved crawlers from indexing this student portal.
+# This does NOT stop malicious/scraping bots — they ignore robots.txt
+# by design. It only stops legitimate search engines (Google, Bing,
+# etc.) from indexing and surfacing this page in search results.
+User-agent: *
+Disallow: /

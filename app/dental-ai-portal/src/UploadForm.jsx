@@ -2,13 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { CASE_CATALOG, MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, RECAPTCHA_SITE_KEY } from "./config.js";
 import { requestUploadUrl, uploadFileToS3 } from "./api.js";
 import { theme, fonts } from "./theme.js";
-import CaseSelect from "./caseselect.jsx";
+import CaseSelect from "./CaseSelect.jsx";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function UploadForm({ onSubmitted, formRef }) {
+export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
   const [caseId, setCaseId] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(studentEmail || "");
   const [reportType, setReportType] = useState("detailed");
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);

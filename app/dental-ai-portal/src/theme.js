@@ -21,6 +21,7 @@ export const theme = {
   heroGradientEnd: "#63c9ec",   // cyan-blue end of the headline gradient
   accentPurple: "#a28ff3",      // soft lavender-purple, secondary accent
   ctaMint: "#72d4c4",           // bright mint CTA button fill
+  lime: "#d4e157",              // needs-attention / pending-state accent
 
   white: "#ffffff",
   ink: "#0f172a",

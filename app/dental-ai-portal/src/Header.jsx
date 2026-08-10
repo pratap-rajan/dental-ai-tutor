@@ -1,6 +1,6 @@
 import { theme, fonts } from "./theme.js";
 
-export default function Header({ onCtaClick }) {
+export default function Header({ onCtaClick, studentName, onSignOut }) {
   return (
     <header style={styles.header}>
       <div style={styles.inner}>
@@ -9,9 +9,17 @@ export default function Header({ onCtaClick }) {
           <span style={styles.wordmark}>PLAN ORE ACADEMY</span>
         </div>
 
-        <button style={styles.cta} onClick={onCtaClick}>
-          Try it now
-        </button>
+        <div style={styles.right}>
+          {studentName && (
+            <div style={styles.identity}>
+              <span style={styles.studentName}>{studentName}</span>
+              <button style={styles.signOutButton} onClick={onSignOut}>Sign out</button>
+            </div>
+          )}
+          <button style={styles.cta} onClick={onCtaClick}>
+            Try it now
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -51,6 +59,35 @@ const styles = {
     fontWeight: 600,
     letterSpacing: "0.03em",
     color: theme.teal,
+    whiteSpace: "nowrap"
+  },
+  right: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14
+  },
+  identity: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10
+  },
+  studentName: {
+    color: theme.slateLight,
+    fontSize: 13,
+    whiteSpace: "nowrap",
+    maxWidth: 160,
+    overflow: "hidden",
+    textOverflow: "ellipsis"
+  },
+  signOutButton: {
+    background: "none",
+    border: `1px solid ${theme.navyLighter}`,
+    color: theme.slateLight,
+    fontSize: 12,
+    padding: "5px 10px",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontFamily: fonts.body,
     whiteSpace: "nowrap"
   },
   cta: {
