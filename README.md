@@ -1,134 +1,106 @@
-# 🦷 Dental AI Tutor
+# Plan Ore Academy — AI Study Pal for ORE & LDS
 
-> AI-powered dental examination assessment platform built on AWS. Students upload a recording — or use the live web portal — and the platform automatically transcribes it, evaluates performance against reference answers and official marking rubrics, generates an examiner-style report, and emails feedback back to the student, all with zero manual steps.
+An AI-powered assessment platform helping UK dental students practise
+ORE and LDS exam-style clinical scenarios (OSCE/DTP stations). A
+student records themselves responding to a case, and receives
+examiner-style feedback — a score, strengths, and areas for
+improvement — generated automatically against the case's official
+marking matrix.
 
-**Live portal:** [Plan Ore Academy](https://main.d2irwx8vfe7n21.amplifyapp.com) — students select a case, enter their email, choose a report type, and upload their recording directly from the browser.
+**Live portal:** https://planoreacademy.co.uk
 
 ---
 
-# 📚 Table of Contents
+## Table of Contents
 
-- [Overview](#-overview)
-- [Business Problem](#-business-problem)
-- [What's Actually Live vs. Planned](#-whats-actually-live-vs-planned)
-- [End-to-End Architecture](#️-end-to-end-architecture)
+- [What's Actually Live](#-whats-actually-live)
+- [End-to-End Architecture](#-end-to-end-architecture)
+- [Where Each Lambda Fires](#-where-each-lambda-fires)
+- [Authentication & Registration (Cognito)](#-authentication--registration-cognito)
 - [Sequence Diagram](#-sequence-diagram)
-- [Assessment Pipeline](#-assessment-pipeline)
-- [AWS Services](#️-aws-services)
-- [Repository Structure](#-repository-structure)
 - [S3 Bucket Structure](#-s3-bucket-structure)
 - [Case Configuration](#-case-configuration)
-- [Upload Flow](#-upload-flow)
+- [Retrieval-Augmented Generation (Bedrock Knowledge Base)](#-retrieval-augmented-generation-bedrock-knowledge-base)
 - [Transcription Flow](#-transcription-flow)
 - [Recording Cleanup Flow](#️-recording-cleanup-flow)
 - [Assessment Flow](#-assessment-flow)
-- [Example Assessment Output](#-example-assessment-output)
+- [Lambda Functions Reference](#-lambda-functions-reference)
 - [Report Generation](#-report-generation)
 - [Email Delivery](#-email-delivery)
-- [React Portal](#-react-portal)
-- [Deployment Guide](#-deployment-guide)
 - [IAM Permissions](#-iam-permissions)
-- [Monitoring & Observability](#-monitoring--observability)
-- [Security](#-security)
-- [Cost Considerations](#-cost-considerations)
-- [Lessons Learned](#-lessons-learned)
-- [Roadmap](#️-roadmap)
-- [Disclaimer](#️-disclaimer)
+- [Adding a New Case](#-adding-a-new-case)
+- [Deployment Guide](#-deployment-guide)
+- [Reliability Notes](#-reliability-notes)
+- [Deployment Gotchas](#-deployment-gotchas)
+- [Known Gaps & Next Steps](#-known-gaps--next-steps)
+- [Roadmap](#-roadmap)
 
 ---
 
-# 🎯 Overview
-
-Dental AI Tutor is designed to help dental students prepare for ORE- and LDS-style examinations (OSCE and DTP stations).
-
-The platform:
-
-1. Accepts a student MP4 recording — uploaded via the web portal or directly to S3.
-2. Automatically transcribes speech using Amazon Transcribe.
-3. Compares the student's performance against:
-   - Case study (image or text)
-   - Official marking matrix
-   - Reference transcript (model answer)
-   - Student's own transcript
-4. Evaluates clinical reasoning, communication, and delivery.
-5. Generates an examiner-style score, grade, strengths, and areas for improvement.
-6. Stores the report in Amazon S3.
-7. Emails the report to the student — either the address they typed into the portal, or a default academy address for manually-triggered runs.
-8. Deletes the original recording once transcription is confirmed complete — only the transcript, metadata, and report are retained, in line with the platform's Terms & Conditions.
-
----
-
-# ❓ Business Problem
-
-Manual evaluation of clinical case presentations is:
-
-- Time-consuming
-- Difficult to scale
-- Subject to examiner variation
-- Expensive for training providers
-
-Dental AI Tutor provides:
-
-- Consistent, rubric-based evaluation
-- Feedback within minutes of upload, not days
-- Scalable to hundreds of cases and students with no added examiner load
-- Confidence/delivery analysis alongside clinical scoring
-- A free, low-friction Stage 1 for enrolled students, with a paid live-roleplay Stage 2 planned
-
----
-
-# ✅ What's Actually Live vs. Planned
-
-This README previously described the target architecture. As of the latest deployment, the following is **live and working end-to-end**, not just planned:
+## ✅ What's Actually Live
 
 | Component | Status |
 |---|---|
-| S3-based case configuration (per-case assets, no hardcoded logic) | ✅ Live — 3 cases |
-| Transcribe Trigger Lambda, EventBridge-driven | ✅ Live |
-| Assessment Lambda (Bedrock scoring, HTML report, email) | ✅ Live |
-| Fully automated pipeline (upload → email, zero manual invocation) | ✅ Live |
-| `reportType` toggle (detailed / basic) | ✅ Live |
-| React portal (case dropdown, email, report type, upload) | ✅ **Live**, deployed on AWS Amplify |
-| Presigned-URL Lambda + API Gateway | ✅ Live |
-| Per-student metadata sidecar (email/report type survive the async Transcribe hop) | ✅ Live |
-| Email delivery via **Amazon SES** (not SNS) | ✅ Live |
-| Automatic recording deletion after successful transcription (T&C compliance) | ✅ Live — EventBridge Rule 3 |
+| React portal, deployed on AWS Amplify at planoreacademy.co.uk | ✅ Live |
+| Google + Microsoft federated sign-in via Amazon Cognito | ✅ Live |
+| Admin bypass (instant access, no approval wait) | ✅ Live |
+| Manual student approval workflow | ✅ Live (console/CLI-based) |
+| 10 working cases, each with full marking + Knowledge Base augmentation | ✅ Live |
+| Fully automated EventBridge pipeline (upload → transcribe → cleanup → assess) | ✅ Live |
+| MP4 / OGG / WAV recording support | ✅ Live |
+| Automatic recording deletion post-transcription (T&C compliance) | ✅ Live |
+| Bedrock Knowledge Base (RAG) — 91 pre-loaded OSCE reference topics | ✅ Live |
+| Email delivery via Amazon SES, domain-authenticated (SPF/DKIM/DMARC) | ✅ Live |
+| SES production access (beyond sandbox limits) | ❌ Requested, not yet approved |
+| Server-side Cognito token verification on upload | ❌ Not yet built — see Known Gaps |
+| In-portal admin approval UI | ❌ Not yet built — console/CLI only |
 | PDF reports | ❌ Not built — HTML only |
-| Cognito auth / faculty dashboard / DynamoDB | ❌ Not built — see [Roadmap](#️-roadmap) |
-| Bedrock Knowledge Base / RAG | ❌ Deliberately not planned yet — see [Roadmap](#️-roadmap) |
-
-A few things differ from the original design on purpose:
-
-- **Amazon SES**, not SNS, sends the report emails — SES supports rich HTML email with an attachment, which SNS does not do natively.
-- The React portal is not a Phase 4 item — it's built, deployed, and is the primary way students interact with the platform today.
-- Prompt templates and marking matrices are **per-case files in S3**, not a single shared `prompts/examiner-prompt.txt` — this lets each case have its own examiner persona, scoring philosophy, and criteria with zero code changes.
 
 ---
 
-# 🏗️ End-to-End Architecture
+## 🏗 End-to-End Architecture
 
 ```mermaid
 flowchart TB
+Student[Student — Browser]
 
-Student[Student — via React Portal or direct S3 upload]
+Portal[React Portal — Amplify]
 
-Portal[React Portal on AWS Amplify]
-PresignLambda[Presigned-URL Lambda]
-APIGW[API Gateway HTTP API]
+Cognito[Amazon Cognito — User Pool]
+
+Google[Google OAuth]
+Microsoft[Microsoft OAuth / OIDC]
+
+PostConfirmLambda["Lambda: cognito-post-confirmation-trigger
+(fires on: Cognito Post Confirmation event)"]
+
+APIGW[API Gateway — orebuddy]
+
+PresignLambda["Lambda: presigned-upload-url
+(fires on: POST /upload-url)"]
 
 UploadBucket[(S3 — student-uploads/)]
 
-EB1[EventBridge Rule 1]
+EB1[EventBridge Rule 1 — Object Created]
 
-TranscribeLambda[Transcribe Trigger Lambda]
+TranscribeLambda["Lambda: assessment-transcribe
+(fires on: EventBridge Rule 1)"]
 
 Transcribe[Amazon Transcribe]
 
 TranscriptBucket[(S3 — transcripts/)]
 
-EB2[EventBridge Rule 2]
+EB3[EventBridge Rule 3 — Transcribe Job State Change]
 
-AssessmentLambda[Assessment Lambda]
+CleanupLambda["Lambda: delete-processed-recording
+(fires on: EventBridge Rule 3, status=COMPLETED)"]
+
+EB2[EventBridge Rule 2 — Object Created]
+
+AssessmentLambda["Lambda: dental-ai-assessment
+(fires on: EventBridge Rule 2)"]
+
+KnowledgeBase[(Bedrock Knowledge Base — 91 OSCE topics)]
 
 Bedrock[Amazon Bedrock — Claude]
 
@@ -138,14 +110,15 @@ SES[Amazon SES]
 
 Email[Student Email]
 
-EB3[EventBridge Rule 3]
-
-CleanupLambda[Recording Cleanup Lambda]
-
 Student --> Portal
-Portal --> APIGW
+Portal --> Cognito
+Cognito --> Google
+Cognito --> Microsoft
+Cognito -->|Post Confirmation event| PostConfirmLambda
+PostConfirmLambda -->|disable unless in Admins group| Cognito
+
+Portal -->|authenticated request| APIGW
 APIGW --> PresignLambda
-PresignLambda --> UploadBucket
 PresignLambda --> UploadBucket
 
 UploadBucket --> EB1
@@ -153,12 +126,14 @@ EB1 --> TranscribeLambda
 TranscribeLambda --> Transcribe
 Transcribe --> TranscriptBucket
 
-Transcribe --> EB3
+Transcribe -->|job status event| EB3
 EB3 --> CleanupLambda
-CleanupLambda -->|deletes mp4 after COMPLETED| UploadBucket
+CleanupLambda -->|deletes mp4/ogg/wav| UploadBucket
 
 TranscriptBucket --> EB2
 EB2 --> AssessmentLambda
+AssessmentLambda -->|retrieve context| KnowledgeBase
+KnowledgeBase --> AssessmentLambda
 AssessmentLambda --> Bedrock
 Bedrock --> AssessmentLambda
 AssessmentLambda --> ReportBucket
@@ -166,519 +141,644 @@ AssessmentLambda --> SES
 SES --> Email
 ```
 
+---
+
+## 📍 Where Each Lambda Fires
+
+This is the quick-reference version of the diagram above — every Lambda
+in this system is event-driven, never called directly by the frontend
+except the presigned-URL request:
+
+| Lambda | Triggered by | Trigger detail |
+|---|---|---|
+| `cognito-post-confirmation-trigger` | **Cognito** | Post Confirmation trigger — fires the moment a Google/Microsoft sign-in is confirmed |
+| `presigned-upload-url` | **API Gateway** | `POST /upload-url` — the only Lambda the frontend calls directly |
+| `assessment-transcribe` | **EventBridge Rule 1** | S3 `Object Created` under `student-uploads/` |
+| `delete-processed-recording` | **EventBridge Rule 3** | Amazon Transcribe `Job State Change` event, `status: COMPLETED` |
+| `dental-ai-assessment` | **EventBridge Rule 2** | S3 `Object Created`, wildcard `transcripts/*.json` |
+
+Three of these five Lambdas fire from **EventBridge**, one fires from
+**API Gateway**, and one fires from **Cognito's own trigger system** —
+three genuinely different trigger mechanisms across the pipeline, each
+chosen because it's the natural event source for that step.
 
 ---
 
-# 🔄 Sequence Diagram
+## 🔐 Authentication & Registration (Cognito)
+
+### Design decision — federated login only, no passwords
+
+Students sign in exclusively via **Google or Microsoft** — there is no
+native email/password sign-up path in this system at all. This is a
+deliberate choice: a personal Gmail or Outlook account is
+significantly harder to casually share between friends than a
+throwaway portal password, which directly supports a per-seat pricing
+model without students splitting the cost of one login.
+
+Cognito's own self-registration feature is explicitly **disabled** —
+federated sign-in still auto-creates a user record without it, and
+disabling it removes any password-based account-creation path
+entirely.
+
+### Approval flow
+
+1. Student clicks "Continue with Google" or "Continue with Microsoft"
+   on the portal's own themed login screen (not Cognito's generic
+   Hosted UI — the portal redirects straight to the provider's
+   consent screen)
+2. On successful sign-in, Cognito's **Post Confirmation** trigger
+   (`cognito-post-confirmation-trigger`) fires
+3. The trigger checks whether this account is a member of the
+   **`Admins`** Cognito group:
+   - **If yes** → nothing happens, the account stays enabled, instant
+     access every time
+   - **If no** → the account is immediately disabled via
+     `AdminDisableUser`, and an optional email notification is sent
+4. A disabled account attempting to sign in is rejected by Cognito
+   itself (either at the `/oauth2/authorize` step or during token
+   exchange, depending on timing) — the portal detects this specific
+   rejection and shows a friendly "your access is pending approval,
+   1-2 business days" screen rather than a generic error
+5. An admin reviews pending accounts and runs `AdminEnableUser` (via
+   CLI, or via a narrowly-scoped IAM console user — see below) — no
+   automated identity verification is performed; the student's name
+   (auto-populated from their Google/Microsoft profile) is the sole
+   basis for the manual approval judgment, since no enrollment ID is
+   collected
+
+### Admin bypass — how "admin" actually works
+
+"Admin" is entirely a matter of **Cognito group membership**, not tied
+to any specific email address. The academy's own account is an admin
+only because it was manually added to the `Admins` group — any other
+account could be promoted the same way:
+
+```bash
+aws cognito-idp admin-add-user-to-group \
+  --user-pool-id eu-west-2_DkCKtuhbh \
+  --username <cognito-username> \
+  --group-name Admins \
+  --region eu-west-2
+
+aws cognito-idp admin-enable-user \
+  --user-pool-id eu-west-2_DkCKtuhbh \
+  --username <cognito-username> \
+  --region eu-west-2
+```
+
+### Delegated approval access, without full AWS access
+
+Day-to-day approvals don't require the account owner's own
+credentials. A narrowly-scoped IAM console user can be created with a
+policy granting **only**:
+```
+cognito-idp:ListUsers
+cognito-idp:AdminEnableUser
+cognito-idp:AdminDisableUser
+cognito-idp:AdminGetUser
+```
+scoped to the single User Pool ARN — nothing else in the AWS account
+is reachable with this policy. That person reviews and approves
+entirely through the Cognito console's **Users** tab (visible
+Enabled/Disabled status, with an Enable button right in the UI).
+
+### Known limitation — Microsoft personal vs. organizational accounts
+
+Cognito's Microsoft OIDC provider is currently configured with an
+issuer URL scoped specifically to **personal** Microsoft accounts
+(Outlook/Hotmail), rather than Microsoft's generic multi-tenant
+routing endpoint. This was a deliberate trade-off: the generic
+`common` issuer caused a "bad id_token issuer" rejection for personal
+accounts (Microsoft substitutes in a fixed real tenant ID for personal
+accounts, which then fails Cognito's strict issuer match against the
+literal word `common`). Fixing this for personal accounts means a
+student with an **organizational** Microsoft 365 account (e.g.
+university-issued) will likely now fail the same check in the
+opposite direction. Supporting both simultaneously is a known,
+not-yet-solved limitation — deferred as a deliberate choice, not an
+oversight.
+
+---
+
+## 🔄 Sequence Diagram
 
 ```mermaid
 sequenceDiagram
-
 participant Student
 participant Portal
+participant Cognito
+participant IdP as Google/Microsoft
+participant PostConfirm as cognito-post-confirmation-trigger
 participant APIGW
-participant PresignLambda
+participant PresignLambda as presigned-upload-url
 participant S3
 participant EventBridge
-participant TranscribeLambda
+participant TranscribeLambda as assessment-transcribe
 participant Transcribe
-participant CleanupLambda
-participant AssessmentLambda
+participant CleanupLambda as delete-processed-recording
+participant AssessmentLambda as dental-ai-assessment
+participant KB as Bedrock Knowledge Base
 participant Bedrock
 participant SES
 
-Student->>Portal: Select case, email, report type, mp4
+Student->>Portal: Click "Continue with Google/Microsoft"
+Portal->>Cognito: Redirect to /oauth2/authorize (PKCE)
+Cognito->>IdP: Federated auth request
+IdP-->>Cognito: Identity confirmed
+Cognito->>PostConfirm: Post Confirmation trigger fires
+PostConfirm->>Cognito: Check Admins group membership
+alt Not an admin
+    PostConfirm->>Cognito: AdminDisableUser
+    Cognito-->>Portal: Reject sign-in (User is disabled)
+    Portal-->>Student: "Pending approval, 1-2 business days"
+else Is an admin
+    Cognito-->>Portal: Auth code issued
+    Portal->>Cognito: Exchange code for tokens (PKCE verifier)
+    Cognito-->>Portal: ID/access tokens
+    Portal-->>Student: Signed in, portal unlocked
+end
+
+Student->>Portal: Select case, email, report type, recording
 Portal->>APIGW: POST /upload-url
 APIGW->>PresignLambda: Invoke
-PresignLambda->>S3: Write metadata sidecar (email, reportType)
+PresignLambda->>S3: Write metadata sidecar (email, reportType, extension)
 PresignLambda-->>Portal: Presigned PUT URL
 
-Portal->>S3: PUT mp4 directly
+Portal->>S3: PUT recording directly
 
 S3->>EventBridge: Object Created (student-uploads/)
-EventBridge->>TranscribeLambda: Invoke
-TranscribeLambda->>Transcribe: Start Job
+EventBridge->>TranscribeLambda: Invoke (Rule 1)
+TranscribeLambda->>Transcribe: Start Job (MediaFormat per extension)
 Transcribe-->>S3: Write transcript JSON
 
 Transcribe->>EventBridge: Job State Change (COMPLETED)
-EventBridge->>CleanupLambda: Invoke
-CleanupLambda->>S3: Delete original mp4
+EventBridge->>CleanupLambda: Invoke (Rule 3)
+CleanupLambda->>S3: Delete original recording
 
 S3->>EventBridge: Object Created (transcripts/)
-EventBridge->>AssessmentLambda: Invoke
+EventBridge->>AssessmentLambda: Invoke (Rule 2)
 AssessmentLambda->>S3: Read case assets + metadata sidecar
-AssessmentLambda->>Bedrock: Evaluate student transcript
+AssessmentLambda->>KB: Retrieve relevant context (filtered by caseId)
+KB-->>AssessmentLambda: Retrieved chunks (or empty)
+AssessmentLambda->>Bedrock: Evaluate transcript against marking matrix
 Bedrock-->>AssessmentLambda: Assessment JSON
 AssessmentLambda->>S3: Save HTML report
 AssessmentLambda->>SES: Send email with report attached
 SES-->>Student: Report delivered
 ```
 
-
 ---
 
-# 🧠 Assessment Pipeline
-
-```mermaid
-flowchart LR
-
-CaseStudy[Case Study — image or text]
-Rubric[Marking Matrix]
-Reference[Reference Transcript]
-StudentTranscript[Student Transcript]
-Metadata[Metadata Sidecar — email, reportType]
-
-PromptTemplate[Per-Case prompt-template.txt]
-
-Claude[Amazon Bedrock — Claude]
-
-Assessment[Assessment JSON]
-
-HTML[HTML Report]
-
-CaseStudy --> PromptTemplate
-Rubric --> PromptTemplate
-Reference --> PromptTemplate
-StudentTranscript --> PromptTemplate
-
-PromptTemplate --> Claude
-Claude --> Assessment
-Assessment --> HTML
-Metadata --> HTML
-```
-
-
-Every case supplies its own `prompt-template.txt`, so the examiner persona, scoring philosophy, deduplication rules, and sample output format can all differ per case with **no Lambda code changes** — the Lambda only ever loads whatever `cases/{caseId}/` contains.
-
----
-
-# ☁️ AWS Services
-
-| Service | Purpose |
-|---|---|
-| Amazon S3 | File storage — case assets, uploads, transcripts, reports, metadata sidecars |
-| Amazon EventBridge | Event routing between upload → transcribe → assessment stages |
-| AWS Lambda | Serverless processing (5 functions — see below) |
-| Amazon Transcribe | Speech-to-text |
-| Amazon Bedrock | AI evaluation (Claude) |
-| Amazon SES | HTML email delivery with report attachment |
-| Amazon API Gateway | HTTP API fronting the presigned-URL Lambda |
-| AWS Amplify | Hosting for the React portal |
-| Amazon CloudWatch | Logging & monitoring |
-| Amazon SQS | Dead-letter queue for EventBridge invoke failures |
-| AWS IAM | Security |
-
-### Lambda functions
-
-| Function | Role |
-|---|---|
-| `assessment-transcribe` | Starts a Transcribe job when an mp4 lands in `student-uploads/` (name is historical — it only handles transcription, not assessment) |
-| `dental-ai-assessment` | Loads case assets, calls Bedrock, generates the HTML report, emails it via SES |
-| `presigned-upload-url` | Fronts the React portal — issues a scoped S3 PUT URL and writes the metadata sidecar |
-| `delete-processed-recording` | Deletes the original mp4 from `student-uploads/` once its Transcribe job reports `COMPLETED` — required for T&C compliance (recordings are not retained after transcription; the transcript and metadata sidecar are) |
-
----
-
-# 📁 Repository Structure
-
-```
-dental-ai-tutor/
-
-├── README.md
-│
-├── app/
-│   └── dental-ai-portal/          ← React portal (Vite), deployed via AWS Amplify
-│       ├── amplify.yml            ← monorepo build spec, appRoot: app/dental-ai-portal
-│       ├── package.json
-│       ├── public/assets/
-│       └── src/
-│           ├── App.jsx
-│           ├── Header.jsx
-│           ├── Hero.jsx
-│           ├── Features.jsx
-│           ├── HowItWorks.jsx
-│           ├── UploadForm.jsx
-│           ├── Confirmation.jsx
-│           ├── Footer.jsx
-│           ├── api.js             ← presigned-URL request + direct S3 upload
-│           ├── config.js          ← API Gateway URL + case catalog
-│           └── theme.js
-│
-├── lambda/
-│   ├── transcribe-trigger/
-│   │   └── lambda_function.py
-│   │
-│   ├── assessment-engine/
-│   │   └── lambda_function.py
-│   │
-│   ├── presigned-upload-url/
-│   │   └── lambda_function.py
-│   │
-│   └── delete-processed-recording/
-│       └── lambda_function.py
-│
-├── docs/
-│   └── architecture/
-│
-└── infrastructure/                ← (planned — see Roadmap)
-```
-
-Case content (`cases/`) and generated artifacts (`student-uploads/`, `transcripts/`, `reports/`) live in **S3**, not in this repo — see below.
-
----
-
-# 🪣 S3 Bucket Structure
+## 📦 S3 Bucket Structure
 
 ```
 planore-ai-tutor/
 
 cases/
-│
 ├── case1-amalgam-highspot/
 │   ├── case-study.jpeg
 │   ├── case-evaluation-matrix-extracted.txt
 │   ├── reference-knowledge.json
-│   └── prompt-template.txt
+│   └── prompt-template.txt          ← filename MUST be exactly this
 │
-├── case2-amalgam-toxicity-filling/
-│   ├── case-study.txt             ← text-only case, no image
-│   ├── case-evaluation-matrix-extracted.txt
-│   ├── reference-knowledge.json
-│   └── prompt-template.txt
+├── case4-bleeding/
+│   └── ... (same 4-file pattern)
 │
-├── case3-avulsed-tooth/
-│   ├── case-study.txt
-│   ├── case-evaluation-matrix-extracted.txt
-│   ├── reference-knowledge.json
-│   └── prompt-template.txt
-│
+└── caseN-.../                       ← same pattern for every case (10 live, more in progress)
+
 student-uploads/
-│
-├── case1-amalgam-highspot/
-│   ├── janedoe-1784980001.mp4             ← transient — deleted after successful transcription
-│   └── janedoe-1784980001.metadata.json   ← { emailId, reportType }, written at upload time, retained
-│
+├── case4-bleeding/
+│   ├── janedoe-1784980001.mp4       ← TRANSIENT — deleted after transcription
+│   │                                   (or .ogg / .wav, format-agnostic)
+│   └── janedoe-1784980001.metadata.json   ← { emailId, reportType, recordingExtension }
+
 transcripts/
-│
-├── case1-amalgam-highspot/
-│   └── janedoe-1784980001.json
-│
+├── case4-bleeding/
+│   └── janedoe-1784980001.json      ← Amazon Transcribe output, RETAINED
+
 reports/
-│
-├── case1-amalgam-highspot/
-│   └── janedoe-1784980001-report.html
+├── case4-bleeding/
+│   └── janedoe-1784980001-report.html   ← RETAINED
+
+knowledge-base-sources/
+├── case1-amalgam-highspot.txt
+├── case1-amalgam-highspot.txt.metadata.json   ← { metadataAttributes: { caseId: "..." } }
+├── periodontitis.txt                ← pre-loaded OSCE topics not yet built as live cases
+├── periodontitis.txt.metadata.json
+└── ... (91 files total, one per OSCE topic)
 ```
 
-Every case is fully self-contained under `cases/{caseId}/` with exactly four files. **The filename must always be `prompt-template.txt`** — not a case-prefixed variant — since the Lambda constructs the path from `caseId` alone.
+The `knowledge-base-sources/` prefix is a separate, independent
+structure from `cases/` — it's the raw material ingested into the
+Bedrock Knowledge Base, not directly read by the assessment Lambda.
 
 ---
 
-# ⚙️ Case Configuration
+## 📋 Case Configuration
 
-Adding a new case requires **zero code changes**:
+Each case is fully defined by four files in `cases/{caseId}/` — no
+code changes are needed to add a new case:
 
-1. Create `cases/{caseId}/` in S3
-2. Upload `case-evaluation-matrix-extracted.txt` and `reference-knowledge.json`
-3. Upload either `case-study.jpeg` (image) or `case-study.txt` (text) — the Assessment Lambda tries the image first and falls back to text automatically
-4. Write a `prompt-template.txt` containing `{marking_matrix}`, `{reference_answer}`, `{student_answer}` placeholders (and optionally `{case_study}` for text-only cases)
-5. Add the case to `CASE_CATALOG` in `app/dental-ai-portal/src/config.js` so it appears in the portal dropdown
+| File | Purpose |
+|---|---|
+| `case-study.jpeg` **or** `case-study.txt` | The clinical scenario |
+| `case-evaluation-matrix-extracted.txt` | The official marking rubric |
+| `reference-knowledge.json` | Transcribe-format reference/model answer |
+| `prompt-template.txt` | The full examiner prompt |
 
-Every `prompt-template.txt` should include:
-- A **deduplication rule** — the same observation must not be repeated across `criteria[].feedback`, `areas_for_improvement`, `confidence_assessment`, and `final_feedback`
-- A **patient/caller identification exclusion** — the model must not assess or comment on name/gender mismatches
-- A worked sample JSON output demonstrating the desired granularity and tone
+Every current `prompt-template.txt` includes, **by default, as a
+standing convention for all future cases too**:
+
+1. A deduplication rule (each feedback point appears in exactly one
+   place — criteria feedback, strengths, areas for improvement, or
+   final summary — never repeated)
+2. A patient identification exclusion (never assess/comment on
+   name/gender matching)
+3. An `ADDITIONAL REFERENCE MATERIAL (if relevant)` section containing
+   `{knowledge_context}` — see the RAG section below
 
 ---
 
-# 📥 Upload Flow
+## 🧠 Retrieval-Augmented Generation (Bedrock Knowledge Base)
 
-**Via the portal (primary path):** student selects a case, enters their email, chooses a report type, and drags in their recording. The browser requests a presigned URL from API Gateway, then uploads directly to S3 — the file never passes through a Lambda.
+### What it is
 
-**Direct S3 upload (manual/testing):**
+A Bedrock Knowledge Base (ID `C0WHNVEHRC`) built from **91 individual
+reference files**, one per OSCE topic, sourced from a comprehensive
+master training document. Each file has a `.metadata.json` sidecar
+tagging it with a `caseId` attribute, enabling **filtered retrieval**
+— a query for case4 only ever searches case4's own content, never
+cross-contaminating with unrelated cases' material.
+
+Only 10 of the 91 pre-loaded topics currently correspond to a live
+case; the remaining 81 are inert until a matching live case is built,
+at which point they become immediately useful with no re-ingestion
+needed.
+
+### How it's used
+
+Every case's `prompt-template.txt` includes a `{knowledge_context}`
+placeholder. In `dental-ai-assessment`, right before building the
+prompt:
+
+```python
+knowledge_context = retrieve_knowledge_base_context(
+    query_text=student_answer,
+    case_id=case_id
+)
 ```
-student-uploads/{caseId}/{studentName}.mp4
-```
 
-Supported format: **MP4** only, up to 200MB (enforced client-side; adjust `MAX_FILE_SIZE_MB` in `config.js`).
+This performs a `bedrock-agent-runtime.retrieve()` call, filtered by
+the case's `caseId` metadata attribute. The retrieved chunks (or an
+empty string, if nothing relevant is found or the Knowledge Base call
+fails for any reason) are folded into the prompt. The prompt
+explicitly instructs Claude to use this content **only where genuinely
+relevant**, and to disregard it entirely if empty — this is additive
+supplementary context, never a replacement for each case's own
+dedicated marking matrix and reference answer, and a Knowledge Base
+outage or empty result never blocks or degrades a case that doesn't
+need it.
 
----
-
-# 🎤 Transcription Flow
-
-`assessment-transcribe` Lambda:
-
-Responsibilities:
-- Parse the real S3 upload event (or EventBridge-wrapped equivalent) to get the exact key that was just uploaded — never scans the bucket in production use
-- Start a Transcribe job (`en-GB`, mp4)
-- Write the resulting transcript to `transcripts/{caseId}/{studentName}.json`
-
-A DLQ (`eventbridge-transcribe-dlq`) is attached to this rule's target so a failed EventBridge→Lambda invocation captures the original event payload instead of failing silently.
+**Environment variable:** `KNOWLEDGE_BASE_ID` on `dental-ai-assessment`.
+**IAM:** `bedrock:Retrieve` scoped to the Knowledge Base's ARN.
 
 ---
 
-# 🗑️ Recording Cleanup Flow
+## 🎙 Transcription Flow
 
-`delete-processed-recording` Lambda, triggered by **EventBridge Rule 3** — separate from Rules 1 and 2, since it listens to a different event source entirely (Amazon Transcribe's own job-status events, not an S3 object-creation event):
+`assessment-transcribe`, triggered by **EventBridge Rule 1**:
 
-**Event pattern:**
 ```json
 {
-  "source": ["aws.transcribe"],
-  "detail-type": ["Transcribe Job State Change"],
+  "source": ["aws.s3"],
+  "detail-type": ["Object Created"],
   "detail": {
-    "TranscriptionJobStatus": ["COMPLETED"]
+    "bucket": { "name": ["planore-ai-tutor"] },
+    "object": { "key": [{ "prefix": "student-uploads/" }] }
   }
 }
 ```
 
-Responsibilities:
-- Fires only when a Transcribe job reports `COMPLETED` — never on `FAILED` or `IN_PROGRESS`, so a source recording is never deleted before a failed job can be investigated or retried
-- Reconstructs the original mp4's S3 key from the Transcribe job name (`{caseId}-{studentName}-{timestamp}`), rather than deleting "the newest file in the folder" — the job name is split from the right (dropping the trailing timestamp), then the remaining segments are tested against real `cases/{candidate}/` folders in S3 to find the correct `caseId`/`studentName` split, since both can themselves contain hyphens
-- Deletes only the exact reconstructed `student-uploads/{caseId}/{studentName}.mp4` key
-- Never touches the metadata sidecar (`.metadata.json`) or the transcript in `transcripts/` — only the mp4 is deleted, matching the platform's Terms & Conditions (recordings are not retained after transcription; the transcript and a small metadata record are)
-- Fails safe: if the job name can't be confidently parsed, or the target file no longer exists, it logs and exits without error rather than risking an incorrect deletion
+Derives `caseId` and student name from the S3 key, and the correct
+Amazon Transcribe `MediaFormat` from the file's actual extension
+(`.mp4`, `.ogg`, or `.wav` — all three are supported end-to-end,
+coordinated across this Lambda, the cleanup Lambda, and the frontend's
+upload validation). Starts the job, output lands in `transcripts/`.
 
-This is why the T&C can state that recordings are deleted after transcription while transcripts and reports remain available — the deletion is enforced automatically by this rule, not a manual/occasional cleanup step.
-
----
-
-# 🧾 Assessment Flow
-
-`dental-ai-assessment` Lambda loads:
-
-- Case study (image or text, whichever exists)
-- Marking matrix
-- Reference transcript
-- Student transcript
-- **Metadata sidecar** (`emailId`, `reportType`) — read from `student-uploads/{caseId}/{studentName}.metadata.json` if the portal was used; falls back to `DEFAULT_NOTIFY_EMAIL` / `DEFAULT_REPORT_TYPE` env vars for manual/CLI-triggered runs
-
-The assembled prompt is sent to Claude on Bedrock. Evaluation criteria are entirely defined per-case by that case's marking matrix — current cases cover history-taking, communication, empathy, time management, and clinical management, but any case can define its own.
+A DLQ (`eventbridge-transcribe-dlq`) is attached to this rule's
+target.
 
 ---
 
-# 📊 Example Assessment Output
+## 🗑️ Recording Cleanup Flow
+
+`delete-processed-recording`, triggered by **EventBridge Rule 3** —
+listening to Amazon Transcribe's own job-status events, a genuinely
+different event source from Rules 1 and 2:
 
 ```json
 {
-  "overall_score": 78,
-  "overall_grade": "MEETS STANDARD",
-  "criteria": [
-    {
-      "name": "Guiding Emergency Replantation",
-      "score": 3,
-      "max_score": 3,
-      "feedback": "Excellent guidance: the Student clearly instructed..."
-    }
-  ],
-  "strengths": [
-    "Calm, consistently reassuring tone throughout an emotionally difficult call"
-  ],
-  "areas_for_improvement": [
-    "Should confirm whether the tooth is stored in a medium..."
-  ],
-  "confidence_assessment": {
-    "score": 80,
-    "feedback": "The Student sounded calm and in control throughout..."
-  },
-  "final_feedback": "The Student managed this time-critical telephone emergency..."
+  "source": ["aws.transcribe"],
+  "detail-type": ["Transcribe Job State Change"],
+  "detail": { "TranscriptionJobStatus": ["COMPLETED"] }
 }
 ```
 
+- Fires only on `COMPLETED`, never `FAILED`/`IN_PROGRESS`
+- Reconstructs the original recording's key from the Transcribe job
+  name, trying each allowed extension (`mp4`/`ogg`/`wav`) via
+  `head_object` until it finds the one that actually exists — since
+  the job-status event doesn't carry the original extension
+- Deletes only the recording — never the metadata sidecar or the
+  transcript
+- Runs independently of the Assessment Lambda — deletion happens the
+  moment transcription completes, regardless of downstream scoring
+  outcome
+
+This is the mechanism that makes the platform's Terms & Conditions
+promise — "recordings are deleted after transcription" — actually
+true, not aspirational.
+
 ---
 
-# 📄 Report Generation
+## 🩺 Assessment Flow
 
-Generated format: **HTML** — a styled, print-ready, single-file report with score cards, a criteria breakdown table, strengths, areas for improvement, and a final summary.
+`dental-ai-assessment`, triggered by **EventBridge Rule 2**:
 
-`reportType` controls two variants from the same underlying JSON:
-- `detailed` (default) — full report including the criteria breakdown table and confidence/delivery section
-- `basic` — score, grade, strengths, areas for improvement, and final summary only, for students who found the full report too long
-
-Example location:
+```json
+{
+  "source": ["aws.s3"],
+  "detail-type": ["Object Created"],
+  "detail": {
+    "bucket": { "name": ["planore-ai-tutor"] },
+    "object": { "key": [{ "wildcard": "transcripts/*.json" }] }
+  }
+}
 ```
-reports/case1-amalgam-highspot/janedoe-1784980001-report.html
-```
 
-PDF generation is not implemented — see [Roadmap](#️-roadmap).
+1. Reads the case's four files from `cases/{caseId}/`
+2. Reads the metadata sidecar (email, report type)
+3. Runs a case-relevance pre-check — a separate, narrow Bedrock call
+   that catches a transcript uploaded against the wrong case, before
+   the expensive full-scoring call runs
+4. Retrieves supplementary context from the Knowledge Base
+5. Builds the full prompt and calls Bedrock (Claude)
+6. Generates the HTML report (`detailed` or `basic`)
+7. Saves the report to S3 and emails it via SES
 
----
+Manual invocation (bypassing the portal/EventBridge) is fully
+supported for testing:
 
-# 📧 Email Delivery
-
-**Amazon SES**, not SNS. `send_raw_email` with a MIME multipart message:
-
-- **From:** a fixed academy sender address (`SES_SENDER` env var)
-- **To:** the student's own email — from the metadata sidecar if uploaded via the portal, otherwise the `DEFAULT_NOTIFY_EMAIL` fallback
-- **Subject:** the `caseId`
-- **Attachment:** the HTML report
-
-SES sandbox mode restricts delivery to pre-verified addresses only. Before opening the portal to real students with arbitrary email addresses, request SES production access.
-
----
-
-# 🖥️ React Portal
-
-Deployed on **AWS Amplify**, built with Vite + React, source at `app/dental-ai-portal/`.
-
-- Landing page: hero, feature highlights, "how it works" section, all themed from the Plan Ore logo's extracted palette (`#293039` navy, `#00c2cb` teal, `#c3edef` mint)
-- Upload form: case dropdown (from a static `CASE_CATALOG` in `config.js`), email field, detailed/basic toggle, drag-and-drop mp4 upload with progress
-- Confirmation screen: staged progress indicator, confirms the email/report type the student will receive
-
-Because the app lives in `app/dental-ai-portal/`, not the repo root, `amplify.yml` must use the **monorepo format**:
-
-```yaml
-version: 1
-applications:
-  - appRoot: app/dental-ai-portal
-    frontend:
-      phases:
-        preBuild:
-          commands:
-            - npm ci
-        build:
-          commands:
-            - npm run build
-      artifacts:
-        baseDirectory: dist
-        files:
-          - '**/*'
-      cache:
-        paths:
-          - node_modules/**/*
+```bash
+aws lambda invoke \
+  --function-name dental-ai-assessment \
+  --payload '{"caseId":"case4-bleeding","student_json_key":"transcripts/case4-bleeding/student1.json","emailId":"academy@planore.co.uk","reportType":"basic"}' \
+  --cli-binary-format raw-in-base64-out \
+  response.json
 ```
 
 ---
 
-# 🚀 Deployment Guide
+## ⚙️ Lambda Functions Reference
 
-## Backend (Lambdas + EventBridge)
-
-1. Create the S3 bucket, `cases/`, `student-uploads/`, `transcripts/`, `reports/` prefixes
-2. Enable **Amazon EventBridge** notifications on the bucket (S3 → Properties → Amazon EventBridge → On)
-3. Deploy `assessment-transcribe` (Transcribe Trigger Lambda)
-4. Create EventBridge Rule 1 — `Object Created`, prefix `student-uploads/` → invoke `assessment-transcribe`
-5. Deploy `dental-ai-assessment` (Assessment Lambda) with `BUCKET_NAME`, `MODEL_ID`, `REGION`, `SES_SENDER`, `DEFAULT_NOTIFY_EMAIL`, `DEFAULT_REPORT_TYPE` env vars
-6. Create EventBridge Rule 2 — `Object Created`, wildcard `transcripts/*.json` → invoke `dental-ai-assessment`
-7. Deploy `delete-processed-recording` with `BUCKET_NAME`, `REGION`, `INPUT_PREFIX` env vars and IAM permissions for `s3:DeleteObject`, `s3:GetObject`, `s3:ListBucket` scoped to `student-uploads/*` and `cases/*`
-8. Create EventBridge Rule 3 — `source: aws.transcribe`, `detail-type: Transcribe Job State Change`, `TranscriptionJobStatus: COMPLETED` → invoke `delete-processed-recording`
-9. Verify a sender identity in SES (and request production access before real students use it)
-10. (Recommended) attach an SQS DLQ to all three rules' targets
-
-## Frontend (React portal)
-
-1. Deploy `presigned-upload-url` Lambda with `BUCKET_NAME`, `REGION` env vars and `s3:PutObject` scoped to `student-uploads/*`
-2. Front it with an API Gateway HTTP API — route `POST /upload-url`, CORS enabled for your Amplify origin
-3. **Also add a CORS policy directly on the S3 bucket** — required separately from API Gateway's CORS, since the browser uploads the file straight to S3
-4. Set `API_BASE_URL` in `app/dental-ai-portal/src/config.js`
-5. Connect the GitHub repo to AWS Amplify, confirm the monorepo `amplify.yml` is picked up
-6. Ensure `package-lock.json` is committed — `npm ci` in the Amplify build will fail without it
-
-## Test end-to-end
-
-Upload a real mp4 through the live portal and confirm a report email arrives — CLI/`curl` testing of the API does **not** prove the browser flow works, since CORS is a browser-only enforcement (see [Lessons Learned](#-lessons-learned)).
+| Lambda | Trigger | Role |
+|---|---|---|
+| `cognito-post-confirmation-trigger` | Cognito Post Confirmation | Disables new accounts unless already in the `Admins` group |
+| `presigned-upload-url` | API Gateway `POST /upload-url` | Issues a scoped S3 PUT URL, writes the metadata sidecar, validates file extension |
+| `assessment-transcribe` | EventBridge Rule 1 | Starts the Transcribe job with the correct MediaFormat |
+| `delete-processed-recording` | EventBridge Rule 3 | Deletes the original recording once transcription completes |
+| `dental-ai-assessment` | EventBridge Rule 2 | Runs the relevance check, Knowledge Base retrieval, Bedrock scoring, report generation, and email |
 
 ---
 
-# 🔐 IAM Permissions
+## 📄 Report Generation
 
-## `assessment-transcribe`
-- `s3:GetObject`, `s3:PutObject`
-- `transcribe:StartTranscriptionJob`, `transcribe:GetTranscriptionJob`
+The report structure is fully generic, iterating over whatever
+`criteria`, `strengths`, `areas_for_improvement`, and
+`confidence_assessment` fields Claude returns. `reportType` controls
+which sections render:
 
-## `dental-ai-assessment`
-- `s3:GetObject`, `s3:PutObject`
+| Section | `detailed` | `basic` |
+|---|---|---|
+| Score & grade | ✅ | ✅ |
+| Criteria breakdown table | ✅ | ❌ |
+| Confidence & delivery | ✅ | ❌ |
+| Key strengths | ✅ | ✅ |
+| Areas for improvement | ✅ | ✅ |
+| Final summary | ✅ | ✅ |
+
+A separate, short rejection-report template is used when the
+case-relevance pre-check fails.
+
+---
+
+## 📧 Email Delivery
+
+- **Service:** Amazon SES (`send_raw_email`), HTML report as an
+  attachment
+- **Domain authentication:** `planore.co.uk` is fully verified with
+  SPF (merged into the domain's existing Google Workspace record —
+  never a second, competing SPF record), DKIM (3 CNAME records), and
+  DMARC — DNS is managed via Wix, despite the domain having been
+  purchased through GoDaddy
+- **Production access:** requested, not yet approved — SES sandbox
+  limits still apply, meaning both sender and every recipient must be
+  individually verified until this clears
+
+---
+
+## 🔑 IAM Permissions
+
+**`cognito-post-confirmation-trigger`:**
+- `cognito-idp:AdminListGroupsForUser`, `cognito-idp:AdminDisableUser`
+  scoped to the User Pool ARN
+- `ses:SendEmail` (optional approval notification)
+
+**`dental-ai-assessment`:**
+- `s3:GetObject`/`PutObject` on case/transcript/report/metadata
+  prefixes
 - `bedrock:InvokeModel`
+- `bedrock:Retrieve` scoped to the Knowledge Base ARN
 - `ses:SendRawEmail`
 
-## `presigned-upload-url`
+**`presigned-upload-url`:**
 - `s3:PutObject` scoped to `student-uploads/*`
 
-## `delete-processed-recording`
+**`delete-processed-recording`:**
 - `s3:DeleteObject`, `s3:GetObject` scoped to `student-uploads/*`
-- `s3:ListBucket` scoped (via condition) to `cases/*` and `student-uploads/*` prefixes only — used to confirm a candidate `caseId` is real while parsing the Transcribe job name
+- `s3:ListBucket` scoped to `cases/*` and `student-uploads/*` prefixes
 
-## EventBridge rule execution roles
-- `lambda:InvokeFunction` scoped to the specific target Lambda's ARN (three rules → three grants, one per target)
-
----
-
-# 📈 Monitoring & Observability
-
-CloudWatch metrics worth tracking:
-- Transcribe job success/failure count
-- EventBridge `Invocations` / `FailedInvocations` per rule
-- Lambda duration and error count
-- SES send success/bounce rate
-
-**A confirmed gap during development:** EventBridge's `FailedInvocations` metric can increment with **no corresponding Lambda log stream at all** — permissions, target ARN, pattern, and concurrency all checked out clean in one such case, and it self-resolved on retry. An SQS dead-letter queue on the rule's target is the only reliable way to capture the actual payload/error when this happens, since CloudTrail does not consistently log EventBridge→Lambda invoke attempts.
+**Delegated approval IAM user** (for a non-owner reviewer):
+- `cognito-idp:ListUsers`, `AdminEnableUser`, `AdminDisableUser`,
+  `AdminGetUser` scoped to the single User Pool ARN — nothing else
 
 ---
 
-# 🔒 Security
+## ➕ Adding a New Case
 
-- IAM least privilege per Lambda (see above)
-- S3 bucket kept private; access only via presigned URLs or Lambda execution roles
-- HTTPS/TLS everywhere (API Gateway, Amplify, S3 presigned URLs)
-- SES sandbox mode restricts test-phase email delivery to verified addresses only — deliberate safeguard before production access is requested
-
----
-
-# 💰 Cost Considerations
-
-Primary cost drivers:
-1. Amazon Bedrock (per-token, scales with prompt + case content size)
-2. Amazon Transcribe (per-minute of audio)
-3. AWS Lambda (per-invocation, generally negligible at this scale)
-4. Amazon SES (near-free at low volume)
-5. Amazon S3 (storage + requests, negligible at this scale)
-6. AWS Amplify Hosting (build minutes + data transfer)
-
-For a pilot with tens of students per day, costs are modest and scale roughly linearly with usage.
+1. Create `cases/caseN-<slug>/` in S3
+2. Upload `case-evaluation-matrix-extracted.txt`,
+   `reference-knowledge.json`, and either `case-study.jpeg` or
+   `case-study.txt`
+3. Write `prompt-template.txt` — including the standard deduplication
+   rule, patient-identification exclusion, and the
+   `{knowledge_context}` placeholder by default
+4. Add the case to `CASE_CATALOG` in
+   `app/dental-ai-portal/src/config.js` and redeploy
+5. If the case's topic matches one of the 91 pre-loaded Knowledge Base
+   files, retrieval becomes useful immediately with no extra work
 
 ---
 
-# 🎓 Lessons Learned
+## 🚀 Deployment Guide
 
-A few non-obvious things worth remembering, surfaced during the build:
+**Frontend (Amplify):**
+- `amplify.yml` must use the wrapped monorepo format (app lives at
+  `app/dental-ai-portal/`, not the repo root):
+  ```yaml
+  version: 1
+  applications:
+    - frontend:
+        phases:
+          preBuild:
+            commands:
+              - npm install
+          build:
+            commands:
+              - npm run build
+        artifacts:
+          baseDirectory: dist
+          files:
+            - '**/*'
+        cache:
+          paths:
+            - node_modules/**/*
+      appRoot: app/dental-ai-portal
+  ```
 
-- **CLI/curl success ≠ browser success.** `curl` and the AWS CLI bypass CORS entirely. A presigned URL or API endpoint that works perfectly from the terminal can still fail in a real browser until CORS is explicitly configured — on **both** API Gateway and, separately, the S3 bucket itself for direct browser uploads.
-- **Amplify monorepo detection is all-or-nothing.** Once an app isn't at the repo root, Amplify requires the wrapped `applications:` YAML format everywhere — a partially-correct flat spec fails with a config error before your code is even touched.
-- **`npm ci` requires a committed `package-lock.json`.** Unlike `npm install`, it refuses to generate one on the fly.
-- **Stale Amplify build config can outlive a "correct" fix.** When both the console settings and the repo's `amplify.yml` looked correct but the build still failed the same way, deleting and recreating the Amplify app (not the GitHub repo — that stays untouched) cleared it.
-- **A missing `.gitignore` for `node_modules` will eventually break your push**, not just bloat your repo — large pushes can hit `HTTP 400` / unexpected-disconnect errors well before hitting any documented size limit.
+**Cognito setup, high level:**
+1. Create the User Pool (Email as sign-in identifier, self-registration OFF)
+2. Register OAuth apps in Google Cloud Console and Azure — publish the
+   Google app to Production once basic-scopes-only (no formal
+   verification needed for `openid email profile`)
+3. Add both as federated identity providers in Cognito, enable them
+   per App Client (a separate step from adding at the User Pool level)
+4. Create the `Admins` group
+5. Deploy `cognito-post-confirmation-trigger`, attach it via
+   `update-user-pool --lambda-config` (verify via `describe-user-pool`
+   — console UI attachment can silently fail to save)
+6. Standardize every redirect/callback URL on the `www` subdomain
+   consistently (not the bare root domain) if the domain uses
+   forwarding rather than a true root-domain alias — bare vs. `www`
+   are different origins for `sessionStorage`/PKCE purposes
+
+**Lambda environment variables:**
+- `dental-ai-assessment`: `BUCKET_NAME`, `MODEL_ID`, `REGION`,
+  `SES_SENDER`, `DEFAULT_NOTIFY_EMAIL`, `DEFAULT_REPORT_TYPE`,
+  `KNOWLEDGE_BASE_ID`
+- `assessment-transcribe`: `INPUT_BUCKET`, `OUTPUT_BUCKET`,
+  `INPUT_PREFIX`, `OUTPUT_PREFIX`, `REGION`
+- `presigned-upload-url`: `BUCKET_NAME`, `REGION`
+- `delete-processed-recording`: `BUCKET_NAME`, `REGION`, `INPUT_PREFIX`
+- `cognito-post-confirmation-trigger`: `REGION`, `ADMIN_GROUP_NAME`,
+  `ADMIN_NOTIFY_EMAIL` (optional), `SES_SENDER` (optional)
 
 ---
 
-# 🛣️ Roadmap
+## 🔁 Reliability Notes
 
-## Phase 1 — Complete ✅
-- MP4 upload (portal or direct S3)
-- Automatic transcription
-- AI assessment against per-case marking matrices
-- HTML reports (detailed/basic)
-- Email delivery via SES
-- React portal, deployed on Amplify
-- Fully automated EventBridge pipeline (3 rules: upload → transcribe, transcript → assess, transcription complete → delete recording)
-- Automatic recording deletion post-transcription, for T&C compliance
+**Recurring lesson, hit repeatedly across this project on two
+different AWS services (EventBridge and Cognito):** a trigger/rule
+attachment made via the console UI can silently fail to save. Always
+verify with a direct read-back CLI command (`describe-user-pool`,
+`list-rules`, `get-policy`) before assuming a console click actually
+took effect.
 
-## Phase 2 — Scaling content (current focus)
-- Grow from 3 cases toward the full 300-case ORE & LDS library
-- Per-case content prep workflow (case study, marking matrix, reference transcript, prompt template)
-- Regulatory/content freshness process — annual review cadence, shared regulatory-guidance file, optional automated freshness-check Lambda (see `/areas/dental-ai-tutor.md` internal notes for full design)
+**Also recurring:** creating an EventBridge rule/target, or a Cognito
+trigger, **before** the target Lambda is actually deployed fails
+cleanly at the permission-grant step. Always deploy and directly test
+a new Lambda before wiring any trigger to it.
 
-## Phase 3 — Live AI Study Buddy (paid, pay-as-you-go)
-- Real-time roleplay: AI plays the patient live, using streaming Transcribe + an LLM patient persona + text-to-speech
-- Timed OSCE-style stations
-- Points-based pricing (e.g. 200 points ≈ 3-4 case attempts)
-- Architecturally distinct from Phase 1/2's async batch pipeline — not an extension of it
-
-## Phase 4 — Platform maturity
-- PDF reports
-- Cognito authentication, faculty dashboard, progress tracking
-- Bedrock Knowledge Base / RAG — only if a genuine cross-case search or open-ended Q&A need emerges; not needed for the current per-case grading architecture
+DLQs are attached to EventBridge rule targets to capture failed
+invocations for debugging.
 
 ---
 
-# ⚠️ Disclaimer
+## 🛠 Deployment Gotchas
 
-This platform is intended for educational assessment and training purposes only and is not intended to provide clinical advice or treatment recommendations.
+1. **Amplify monorepo spec** requires the wrapped `applications:`
+   format — a flat spec fails with `Monorepo spec provided without
+   "applications" key`.
+2. **`npm ci` requires a committed `package-lock.json`.**
+3. **CORS for a presigned-URL flow needs configuring in two places** —
+   API Gateway's own CORS covers the `POST /upload-url` call; the
+   actual upload is a direct browser-to-S3 PUT requiring its own CORS
+   policy on the bucket.
+4. **Cross-origin `sessionStorage` breaks PKCE flows silently.** If a
+   domain is only reachable via a forwarding redirect (e.g.
+   `example.com` → `www.example.com` via registrar-level forwarding,
+   not a true DNS alias), the bare and `www` versions are different
+   origins for `sessionStorage`. A PKCE verifier written on one and
+   read on the other is always empty, causing sign-in to silently fail
+   with no useful error. Fix: standardize every OAuth
+   redirect/callback URL on the one real, non-forwarded serving
+   origin.
+5. **Google requires an explicit `select_account` prompt parameter**
+   to reliably show its account chooser on every attempt; Microsoft
+   requires it even more — without it, Microsoft silently reuses
+   whatever account is already active in the browser with no way to
+   pick a different one.
+6. **`window.location.href` navigation + browser back-forward cache
+   (bfcache) can leave React state stuck.** If a component sets
+   loading state before navigating away (e.g. disabling a button
+   during an OAuth redirect), and the browser restores the page from
+   bfcache on a Back navigation rather than a fresh load, that state
+   comes back stuck with nothing to reset it. Fix: listen for the
+   `pageshow` event and check `event.persisted`.
+7. **Native `<select>` dropdown styling is inconsistently supported.**
+   Requires `color-scheme: dark` plus explicit per-`<option>`
+   background/color — a real platform limitation. (This project moved
+   away from a native select to a custom searchable combobox once the
+   case count grew, sidestepping this entirely.)
+
+---
+
+## 🚧 Known Gaps & Next Steps
+
+1. **No server-side Cognito token verification on upload.** The React
+   login gate is a real UX boundary, but `presigned-upload-url`
+   doesn't yet independently verify the access token's signature
+   (against Cognito's JWKS), expiry, `token_use`, or `client_id`
+   before accepting a request. A disabled account is blocked from
+   *signing in*, but a stale or crafted token calling the API directly
+   isn't yet rejected server-side.
+2. **No in-portal admin approval UI.** Reviewing and approving pending
+   students is entirely console/CLI-based today.
+3. **Microsoft personal vs. organizational accounts** — see the
+   Authentication section above; currently only personal Outlook
+   accounts work correctly.
+4. **SES production access** — still pending approval; sandbox limits
+   apply until cleared.
+5. **Bounce/complaint SNS handling** — not yet built; recommended
+   before submitting for SES production access.
+6. **Single point of failure on the `Admins` group** — only one
+   account is currently promoted; worth adding a backup admin.
+
+---
+
+## 🗺 Roadmap
+
+**Phase 1 — Complete ✅**
+- Portal, upload, transcription, assessment, email, fully automated
+  pipeline, recording cleanup, MP4/OGG/WAV support
+
+**Phase 2 — In progress**
+- Cognito federated authentication and approval workflow (mostly
+  live — see Known Gaps)
+- Bedrock Knowledge Base / RAG (live, 91 topics pre-loaded)
+- Scaling toward 300 cases (10 live)
+- In-portal admin dashboard
+- Server-side token verification hardening
+
+**Phase 3 — Planned**
+- Live AI Study Buddy (voice-only roleplay patient, real-time loop)
