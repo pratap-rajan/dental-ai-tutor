@@ -65,6 +65,10 @@ export default function App() {
   // validates the token server-side and will reject a disabled
   // account's requests even if a stale token is still held client-side,
   // so this gate is a UX convenience, not the actual security boundary.
+  if (status === "pending_approval") {
+    return <Login pendingApproval />;
+  }
+
   if (status === "unauthenticated" || status === "error") {
     return <Login authError={status === "error"} errorDetail={error} />;
   }

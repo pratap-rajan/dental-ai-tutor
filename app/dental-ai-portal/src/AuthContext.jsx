@@ -135,7 +135,7 @@ async function exchangeCodeForTokens(code) {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
-  const [status, setStatus] = useState("loading"); // loading | authenticated | unauthenticated | error
+  const [status, setStatus] = useState("loading"); // loading | authenticated | unauthenticated | pending_approval | error
   const [error, setError] = useState(null);
 
   const completeSignIn = useCallback((tokens) => {
@@ -151,22 +151,29 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // Guards against React 18 StrictMode's deliberate double-invocation
-    // of effects in development, and against this effect somehow
-    // re-running before the async exchange settles. Both the
-    // authorization code and the PKCE verifier are single-use — a
-    // second exchange attempt with the same code fails at Cognito
-    // (invalid_grant), which otherwise looks just like "sign-in
-    // silently didn't work."
     let cancelled = false;
 
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
     const oauthError = url.searchParams.get("error");
+    const oauthErrorDescription = url.searchParams.get("error_description");
 
     if (oauthError) {
-      setError(oauthError);
-      setStatus("error");
+      // Cognito's own /oauth2/authorize step rejects a disabled
+      // account BEFORE ever issuing a code — this is the expected,
+      // correct outcome for a brand-new student awaiting approval,
+      // not a real failure. Route it to its own status so the UI can
+      // show the friendly "pending approval" screen instead of a
+      // generic error box.
+      const isDisabledAccount =
+        oauthErrorDescription && /not enabled/i.test(oauthErrorDescription);
+
+      if (isDisabledAccount) {
+        setStatus("pending_approval");
+      } else {
+        setError(oauthErrorDescription || oauthError);
+        setStatus("error");
+      }
       window.history.replaceState({}, "", COGNITO_REDIRECT_URI);
       return;
     }
@@ -181,8 +188,16 @@ export function AuthProvider({ children }) {
         .catch((ex) => {
           if (cancelled) return;
           console.error("Token exchange failed:", ex);
-          setError(ex.message || "sign_in_failed");
-          setStatus("error");
+          // The token exchange step can ALSO surface a disabled
+          // account, depending on exactly when Cognito checks — cover
+          // both places consistently, same detection logic.
+          const isDisabledAccount = /not enabled/i.test(ex.message || "");
+          if (isDisabledAccount) {
+            setStatus("pending_approval");
+          } else {
+            setError(ex.message || "sign_in_failed");
+            setStatus("error");
+          }
           // Strip ?code=... even on failure — a stale/consumed code
           // left in the URL would otherwise be resubmitted on refresh
           // and fail again with the same confusing result.
@@ -210,7 +225,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = {
-    status,          // "loading" | "authenticated" | "unauthenticated" | "error"
+    status,          // "loading" | "authenticated" | "unauthenticated" | "pending_approval" | "error"
     session,          // { idToken, accessToken, refreshToken, claims } | null
     error,
     signOut,
