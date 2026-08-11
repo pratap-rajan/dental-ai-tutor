@@ -71,203 +71,215 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
 
   return (
     <div style={styles.page}>
-      <div style={styles.centerWrap}>
-        <Brand />
+      <div style={styles.layoutRow}>
+        <div style={styles.centerWrap}>
+          <Brand />
 
-        <div
-          style={{
-            ...styles.card,
-            borderColor: cardHovered ? cardAccent : theme.navyLighter,
-            boxShadow: cardHovered
-              ? `0 0 0 1px ${cardAccent}44, 0 0 60px -10px ${cardAccent}99, 0 16px 40px rgba(0,0,0,0.4)`
-              : "0 0 60px -14px rgba(162,143,243,0.28)"
-          }}
-          onMouseEnter={() => setCardHovered(true)}
-          onMouseLeave={() => setCardHovered(false)}
-        >
           <div
             style={{
-              ...styles.cardBacklight,
-              background: `radial-gradient(circle at 30% 10%, ${cardAccent}2e, transparent 65%)`,
-              opacity: cardHovered ? 1 : 0
+              ...styles.card,
+              borderColor: cardHovered ? cardAccent : theme.navyLighter,
+              boxShadow: cardHovered
+                ? `0 0 0 1px ${cardAccent}44, 0 0 60px -10px ${cardAccent}99, 0 16px 40px rgba(0,0,0,0.4)`
+                : "0 0 60px -14px rgba(162,143,243,0.28)"
             }}
-          />
-
-          <div style={styles.cardInner}>
-            <h1 style={styles.title}>Sign in to continue</h1>
-            <p style={styles.subtitle}>Plan Ore Academy — ORE and LDS practice</p>
-
-            {authError && (
-              <div style={styles.errorBox}>
-                <i className="ti ti-alert-circle" style={{ fontSize: 15, flexShrink: 0 }} />
-                <span>
-                  Sign-in didn't go through. Please try again.
-                  {errorDetail && (
-                    <span style={{ display: "block", opacity: 0.75, fontSize: 11, marginTop: 3 }}>
-                      {errorDetail}
-                    </span>
-                  )}
-                </span>
-              </div>
-            )}
-
-            <button
+            onMouseEnter={() => setCardHovered(true)}
+            onMouseLeave={() => setCardHovered(false)}
+          >
+            <div
               style={{
-                ...styles.providerButton,
-                background: "#fff",
-                color: "#1f1f1f",
-                opacity: tcAccepted ? 1 : 0.5,
-                cursor: tcAccepted ? "pointer" : "not-allowed",
-                boxShadow: googleHovered && tcAccepted ? "0 0 24px -4px rgba(255,255,255,0.55)" : "none",
-                transform: googleHovered && tcAccepted ? "translateY(-1px)" : "translateY(0)"
+                ...styles.cardBacklight,
+                background: `radial-gradient(circle at 30% 10%, ${cardAccent}2e, transparent 65%)`,
+                opacity: cardHovered ? 1 : 0
               }}
-              onClick={() => handleProvider("Google")}
-              onMouseEnter={() => setGoogleHovered(true)}
-              onMouseLeave={() => setGoogleHovered(false)}
-              disabled={!tcAccepted || starting}
-            >
-              <GoogleIcon />
-              Continue with Google
-            </button>
+            />
 
-            <button
-              style={{
-                ...styles.providerButton,
-                background: theme.navyLighter,
-                color: "#fff",
-                border: `1px solid ${msHovered && tcAccepted ? theme.tealGlow : theme.navyLighter}`,
-                opacity: tcAccepted ? 1 : 0.5,
-                cursor: tcAccepted ? "pointer" : "not-allowed",
-                boxShadow: msHovered && tcAccepted ? `0 0 24px -6px ${theme.tealGlow}88` : "none",
-                transform: msHovered && tcAccepted ? "translateY(-1px)" : "translateY(0)"
-              }}
-              onClick={() => handleProvider("Microsoft")}
-              onMouseEnter={() => setMsHovered(true)}
-              onMouseLeave={() => setMsHovered(false)}
-              disabled={!tcAccepted || starting}
-            >
-              <MicrosoftIcon />
-              Continue with Microsoft
-            </button>
+            <div style={styles.cardInner}>
+              <h1 style={styles.title}>Sign in to continue</h1>
+              <p style={styles.subtitle}>Plan Ore Academy — ORE and LDS practice</p>
 
-            <div style={styles.divider}>
-              <div style={styles.dividerLine} />
-              <span style={styles.dividerText}>your name is your enrollment check</span>
-              <div style={styles.dividerLine} />
-            </div>
+              {authError && (
+                <div style={styles.errorBox}>
+                  <i className="ti ti-alert-circle" style={{ fontSize: 15, flexShrink: 0 }} />
+                  <span>
+                    Sign-in didn't go through. Please try again.
+                    {errorDetail && (
+                      <span style={{ display: "block", opacity: 0.75, fontSize: 11, marginTop: 3 }}>
+                        {errorDetail}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
 
-            <div style={styles.infoBox}>
-              <p style={styles.infoText}>
-                We use your Google or Microsoft account to verify who you are — we never see or store your password.
-              </p>
-            </div>
-
-            <div style={styles.tcRow}>
               <button
-                type="button"
-                aria-label={tcAccepted ? "Terms accepted" : "Accept terms and conditions"}
-                aria-pressed={tcAccepted}
-                onClick={handleCheckboxToggle}
                 style={{
-                  ...styles.checkbox,
-                  borderColor: tcAccepted ? theme.lime : theme.navyLighter,
-                  background: tcAccepted ? theme.lime : "transparent"
+                  ...styles.providerButton,
+                  background: "#fff",
+                  color: "#1f1f1f",
+                  opacity: tcAccepted ? 1 : 0.5,
+                  cursor: tcAccepted ? "pointer" : "not-allowed",
+                  boxShadow: googleHovered && tcAccepted ? "0 0 24px -4px rgba(255,255,255,0.55)" : "none",
+                  transform: googleHovered && tcAccepted ? "translateY(-1px)" : "translateY(0)"
                 }}
+                onClick={() => handleProvider("Google")}
+                onMouseEnter={() => setGoogleHovered(true)}
+                onMouseLeave={() => setGoogleHovered(false)}
+                disabled={!tcAccepted || starting}
               >
-                {tcAccepted && <span style={styles.checkboxTick}>✓</span>}
+                <GoogleIcon />
+                Continue with Google
               </button>
-              <p style={styles.tcText}>
-                I have read and accept the{" "}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  style={styles.tcLink}
-                  onClick={() => setTcPanelOpen((v) => !v)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") setTcPanelOpen((v) => !v);
+
+              <button
+                style={{
+                  ...styles.providerButton,
+                  background: theme.navyLighter,
+                  color: "#fff",
+                  border: `1px solid ${msHovered && tcAccepted ? theme.tealGlow : theme.navyLighter}`,
+                  opacity: tcAccepted ? 1 : 0.5,
+                  cursor: tcAccepted ? "pointer" : "not-allowed",
+                  boxShadow: msHovered && tcAccepted ? `0 0 24px -6px ${theme.tealGlow}88` : "none",
+                  transform: msHovered && tcAccepted ? "translateY(-1px)" : "translateY(0)"
+                }}
+                onClick={() => handleProvider("Microsoft")}
+                onMouseEnter={() => setMsHovered(true)}
+                onMouseLeave={() => setMsHovered(false)}
+                disabled={!tcAccepted || starting}
+              >
+                <MicrosoftIcon />
+                Continue with Microsoft
+              </button>
+
+              <div style={styles.divider}>
+                <div style={styles.dividerLine} />
+                <span style={styles.dividerText}>your name is your enrollment check</span>
+                <div style={styles.dividerLine} />
+              </div>
+
+              <div style={styles.infoBox}>
+                <p style={styles.infoText}>
+                  We use your Google or Microsoft account to verify who you are — we never see or store your password.
+                </p>
+              </div>
+
+              <div style={styles.tcRow}>
+                <button
+                  type="button"
+                  aria-label={tcAccepted ? "Terms accepted" : "Accept terms and conditions"}
+                  aria-pressed={tcAccepted}
+                  onClick={handleCheckboxToggle}
+                  style={{
+                    ...styles.checkbox,
+                    borderColor: tcAccepted ? theme.lime : theme.navyLighter,
+                    background: tcAccepted ? theme.lime : "transparent"
                   }}
                 >
-                  Terms and Conditions
-                </span>{" "}
-                for recording submission and assessment
-              </p>
-            </div>
-            <p style={styles.tcHint}>Required to sign in</p>
+                  {tcAccepted && <span style={styles.checkboxTick}>✓</span>}
+                </button>
+                <p style={styles.tcText}>
+                  I have read and accept the{" "}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    style={styles.tcLink}
+                    onClick={() => setTcPanelOpen((v) => !v)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") setTcPanelOpen((v) => !v);
+                    }}
+                  >
+                    Terms and Conditions
+                  </span>{" "}
+                  for recording submission and assessment
+                </p>
+              </div>
+              <p style={styles.tcHint}>Required to sign in</p>
 
+              <button
+                type="button"
+                style={{
+                  ...styles.tcTile,
+                  borderColor: tcTileHovered || tcPanelOpen ? theme.purpleGlow : theme.navyLighter,
+                  boxShadow: tcTileHovered ? `0 0 24px -8px ${theme.purpleGlow}99` : "none"
+                }}
+                onClick={() => setTcPanelOpen((v) => !v)}
+                onMouseEnter={() => setTcTileHovered(true)}
+                onMouseLeave={() => setTcTileHovered(false)}
+              >
+                <div style={styles.tcTileIcon}>
+                  <i className="ti ti-file-text" style={{ color: theme.purpleGlow, fontSize: 17 }} />
+                </div>
+                <div style={styles.tcTileContent}>
+                  <div style={styles.tcTileTitle}>Terms and Conditions</div>
+                  <div style={styles.tcTileSubtitle}>
+                    {tcPanelOpen ? "Open on the side — tap to close" : "Tap to view the full terms"}
+                  </div>
+                </div>
+                {tcAccepted && !tcPanelOpen ? (
+                  <span style={styles.acceptedBadge}>
+                    <span style={styles.smallTick}>✓</span>
+                    Accepted
+                  </span>
+                ) : (
+                  <i className={`ti ti-chevron-${tcPanelOpen ? "left" : "right"}`} style={{ color: theme.slateLight, fontSize: 16 }} />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Terms panel sits BESIDE the sign-in card on wide screens
+            (a true side panel), and stacks below it on narrow/mobile
+            screens where side-by-side won't fit — still fully inline
+            on the same page either way, never a separate route or a
+            dimmed full-screen overlay. */}
+        {tcPanelOpen && (
+          <div style={styles.tcSidePanel}>
             <button
               type="button"
-              style={{
-                ...styles.tcTile,
-                borderColor: tcTileHovered ? theme.purpleGlow : theme.navyLighter,
-                boxShadow: tcTileHovered ? `0 0 24px -8px ${theme.purpleGlow}99` : "none"
-              }}
-              onClick={() => setTcPanelOpen((v) => !v)}
-              onMouseEnter={() => setTcTileHovered(true)}
-              onMouseLeave={() => setTcTileHovered(false)}
+              onClick={() => setTcPanelOpen(false)}
+              style={styles.tcInlineClose}
+              aria-label="Close terms and conditions"
             >
+              <span style={styles.closeIcon}>✕</span>
+            </button>
+
+            <div style={styles.tcPanelHeader}>
               <div style={styles.tcTileIcon}>
                 <i className="ti ti-file-text" style={{ color: theme.purpleGlow, fontSize: 17 }} />
               </div>
-              <div style={styles.tcTileContent}>
-                <div style={styles.tcTileTitle}>Terms and Conditions</div>
-                <div style={styles.tcTileSubtitle}>
-                  {tcPanelOpen ? "Tap to collapse" : "Tap to view the full terms"}
-                </div>
-              </div>
-              {tcAccepted && !tcPanelOpen ? (
-                <span style={styles.acceptedBadge}>
-                  <span style={styles.smallTick}>✓</span>
-                  Accepted
-                </span>
-              ) : (
-                <i className={`ti ti-chevron-${tcPanelOpen ? "up" : "down"}`} style={{ color: theme.slateLight, fontSize: 16 }} />
-              )}
-            </button>
+              <p style={styles.tcPanelHeaderTitle}>Terms and Conditions</p>
+            </div>
 
-            {/* Terms panel expands INLINE within the same card — no
-                separate page, no detached floating overlay. */}
-            {tcPanelOpen && (
-              <div style={styles.tcInlinePanel}>
-                <button
-                  type="button"
-                  onClick={() => setTcPanelOpen(false)}
-                  style={styles.tcInlineClose}
-                  aria-label="Close terms and conditions"
-                >
-                  <span style={styles.closeIcon}>✕</span>
-                </button>
+            <div style={styles.tcPanelBody}>
+              <TcSection n="1" title="What we collect and why">
+                Your name, email, your practice recording, and the case selected — used solely to generate examiner-style feedback against the relevant marking criteria.
+              </TcSection>
+              <TcSection n="2" title="How your recording is processed">
+                Your recording is transcribed to text, then assessed using Anthropic's Claude (Sonnet) via Amazon Bedrock, against your case's official marking matrix. All processing takes place in the UK AWS region, even if you submit from outside the UK.
+              </TcSection>
+              <TcSection n="3" title="What we keep, and for how long">
+                Your original recording is deleted once your assessment is generated. The text transcript, a small metadata record, and your report are retained so your feedback history stays available. You can request deletion at any time.
+              </TcSection>
+              <TcSection n="4" title="Where your data is stored">
+                Secure, encrypted AWS cloud infrastructure, UK region, with industry-standard access controls.
+              </TcSection>
+              <TcSection n="5" title="Who sees your data">
+                Not shared with third parties for their own purposes. Processed only by automated systems, and by AWS and Anthropic strictly as needed to run this service.
+              </TcSection>
+              <TcSection n="6" title="Accuracy and limitations">
+                AI-generated feedback supports exam preparation only and is not an official result. Always refer to your course provider's official guidance.
+              </TcSection>
+            </div>
 
-                <div style={styles.tcPanelBody}>
-                  <TcSection n="1" title="What we collect and why">
-                    Your name, email, your practice recording, and the case selected — used solely to generate examiner-style feedback against the relevant marking criteria.
-                  </TcSection>
-                  <TcSection n="2" title="How your recording is processed">
-                    Your recording is transcribed to text, then assessed using Anthropic's Claude (Sonnet) via Amazon Bedrock, against your case's official marking matrix. All processing takes place in the UK AWS region, even if you submit from outside the UK.
-                  </TcSection>
-                  <TcSection n="3" title="What we keep, and for how long">
-                    Your original recording is deleted once your assessment is generated. The text transcript, a small metadata record, and your report are retained so your feedback history stays available. You can request deletion at any time.
-                  </TcSection>
-                  <TcSection n="4" title="Where your data is stored">
-                    Secure, encrypted AWS cloud infrastructure, UK region, with industry-standard access controls.
-                  </TcSection>
-                  <TcSection n="5" title="Who sees your data">
-                    Not shared with third parties for their own purposes. Processed only by automated systems, and by AWS and Anthropic strictly as needed to run this service.
-                  </TcSection>
-                  <TcSection n="6" title="Accuracy and limitations">
-                    AI-generated feedback supports exam preparation only and is not an official result. Always refer to your course provider's official guidance.
-                  </TcSection>
-                </div>
-
-                <div style={styles.tcPanelFooter}>
-                  <button type="button" onClick={handleAgree} style={styles.tcAgreeButton}>
-                    <span style={styles.agreeTick}>✓</span>
-                    I agree
-                  </button>
-                </div>
-              </div>
-            )}
+            <div style={styles.tcPanelFooter}>
+              <button type="button" onClick={handleAgree} style={styles.tcAgreeButton}>
+                <span style={styles.agreeTick}>✓</span>
+                I agree
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -329,7 +341,18 @@ const styles = {
     position: "relative",
     overflow: "hidden"
   },
-  centerWrap: { width: "100%", maxWidth: 400, position: "relative", zIndex: 1 },
+  layoutRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 16,
+    alignItems: "flex-start",
+    justifyContent: "center",
+    width: "100%",
+    maxWidth: 820,
+    position: "relative",
+    zIndex: 1
+  },
+  centerWrap: { width: "100%", maxWidth: 400 },
   brandRow: {
     display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 22
   },
@@ -405,25 +428,38 @@ const styles = {
   },
   smallTick: { fontSize: 12, fontWeight: 700, lineHeight: 1 },
 
-  // Inline, same-card, same-page expanding panel — replaces the old
-  // separate fixed-position overlay + backdrop entirely.
-  tcInlinePanel: {
+  // Terms panel — sits BESIDE the sign-in card as a genuine side panel
+  // on wide screens (flexWrap on layoutRow lets it wrap below on
+  // narrow/mobile screens instead). Still fully inline on the same
+  // page, never a separate route, never a dimmed full-screen overlay.
+  tcSidePanel: {
     position: "relative",
-    marginTop: 12,
-    background: "rgba(9,11,22,0.7)",
+    width: "100%",
+    maxWidth: 360,
+    background: "rgba(13,16,33,0.92)",
+    backdropFilter: "blur(6px)",
     border: `1px solid ${theme.navyLighter}`,
-    borderRadius: 12,
-    overflow: "hidden"
+    borderRadius: 16,
+    boxShadow: "0 0 60px -14px rgba(162,143,243,0.3), 0 16px 40px rgba(0,0,0,0.35)",
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
+    maxHeight: 560
   },
   tcInlineClose: {
-    position: "absolute", top: 10, right: 10, zIndex: 2,
-    width: 26, height: 26, border: `1.5px solid ${theme.tealGlow}`, borderRadius: 7,
+    position: "absolute", top: 14, right: 14, zIndex: 2,
+    width: 28, height: 28, border: `1.5px solid ${theme.tealGlow}`, borderRadius: 7,
     background: "rgba(99,209,230,0.12)", display: "flex", alignItems: "center", justifyContent: "center",
     cursor: "pointer"
   },
-  closeIcon: { color: theme.tealGlow, fontSize: 12, fontWeight: 700, lineHeight: 1 },
-  tcPanelBody: { maxHeight: 260, overflowY: "auto", padding: "18px 44px 4px 16px" },
-  tcPanelFooter: { padding: "12px 16px", borderTop: `1px solid ${theme.navyLighter}` },
+  closeIcon: { color: theme.tealGlow, fontSize: 13, fontWeight: 700, lineHeight: 1 },
+  tcPanelHeader: {
+    display: "flex", alignItems: "center", gap: 10,
+    padding: "18px 44px 14px 18px", borderBottom: `1px solid ${theme.navyLighter}`, flexShrink: 0
+  },
+  tcPanelHeaderTitle: { color: "#fff", fontSize: 14, fontWeight: 500, margin: 0 },
+  tcPanelBody: { flex: 1, overflowY: "auto", padding: "16px 18px" },
+  tcPanelFooter: { padding: "12px 18px", borderTop: `1px solid ${theme.navyLighter}`, flexShrink: 0 },
   tcAgreeButton: {
     width: "100%", background: theme.navyLighter, border: `1px solid ${theme.lime}`, color: theme.lime,
     borderRadius: 8, padding: 10, fontSize: 13, fontWeight: 500, cursor: "pointer",
