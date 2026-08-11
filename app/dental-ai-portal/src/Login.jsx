@@ -3,7 +3,7 @@ import { theme, fonts } from "./theme.js";
 import { buildAuthorizeUrl } from "./authConfig.js";
 import { preparePkceChallenge } from "./AuthContext.jsx";
 
-export default function Login({ pendingApproval, authError }) {
+export default function Login({ pendingApproval, authError, errorDetail }) {
   const [tcAccepted, setTcAccepted] = useState(false);
   const [tcPanelOpen, setTcPanelOpen] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -70,7 +70,14 @@ export default function Login({ pendingApproval, authError }) {
               className="ti ti-alert-circle"
               style={{ fontSize: 15, flexShrink: 0 }}
             />
-            <span>Sign-in didn't go through. Please try again.</span>
+            <span>
+              Sign-in didn't go through. Please try again.
+              {errorDetail && (
+                <span style={{ display: "block", opacity: 0.75, fontSize: 11, marginTop: 3 }}>
+                  {errorDetail}
+                </span>
+              )}
+            </span>
           </div>
         )}
 

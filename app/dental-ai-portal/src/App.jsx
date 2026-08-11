@@ -50,7 +50,7 @@ export default function App() {
     setSubmission(null);
   }
 
-  const { status, name, email, signOut } = useAuth();
+  const { status, name, email, error, signOut } = useAuth();
 
   // Still checking for a stored/callback session on first load.
   if (status === "loading") {
@@ -66,7 +66,7 @@ export default function App() {
   // account's requests even if a stale token is still held client-side,
   // so this gate is a UX convenience, not the actual security boundary.
   if (status === "unauthenticated" || status === "error") {
-    return <Login authError={status === "error"} />;
+    return <Login authError={status === "error"} errorDetail={error} />;
   }
 
   return (

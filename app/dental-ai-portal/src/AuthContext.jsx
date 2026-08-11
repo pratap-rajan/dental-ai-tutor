@@ -114,7 +114,20 @@ async function exchangeCodeForTokens(code) {
   });
 
   if (!response.ok) {
-    throw new Error(`Token exchange failed: ${response.status}`);
+    // Surface Cognito's actual error body — token-exchange failures
+    // (e.g. disabled account, expired code, PKCE mismatch) return a
+    // JSON body explaining exactly why, and that detail is essential
+    // for diagnosing a failure that otherwise just looks like "bounced
+    // back to login" with no explanation.
+    let detail = "";
+    try {
+      const errBody = await response.json();
+      detail = errBody.error_description || errBody.error || JSON.stringify(errBody);
+    } catch {
+      detail = await response.text().catch(() => "");
+    }
+    console.error(`Token exchange failed (${response.status}):`, detail);
+    throw new Error(`Token exchange failed: ${response.status}${detail ? " — " + detail : ""}`);
   }
 
   return response.json(); // { id_token, access_token, refresh_token, ... }
@@ -138,8 +151,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // Case 1: we're on a fresh page load, no OAuth callback params —
-    // just try to restore a previously stored, still-valid session.
+    // Guards against React 18 StrictMode's deliberate double-invocation
+    // of effects in development, and against this effect somehow
+    // re-running before the async exchange settles. Both the
+    // authorization code and the PKCE verifier are single-use — a
+    // second exchange attempt with the same code fails at Cognito
+    // (invalid_grant), which otherwise looks just like "sign-in
+    // silently didn't work."
+    let cancelled = false;
+
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
     const oauthError = url.searchParams.get("error");
@@ -147,31 +167,32 @@ export function AuthProvider({ children }) {
     if (oauthError) {
       setError(oauthError);
       setStatus("error");
-      // Clean the error params out of the URL so a refresh doesn't re-trigger this.
       window.history.replaceState({}, "", COGNITO_REDIRECT_URI);
       return;
     }
 
     if (code) {
-      // Case 2: we've just been redirected back from Cognito after a
-      // successful Google/Microsoft sign-in — exchange the code for
-      // real tokens.
       exchangeCodeForTokens(code)
         .then((tokens) => {
+          if (cancelled) return;
           completeSignIn(tokens);
-          // Strip the ?code=... param from the URL so it can't be
-          // resubmitted (e.g. on refresh) and so the URL looks clean.
           window.history.replaceState({}, "", COGNITO_REDIRECT_URI);
         })
         .catch((ex) => {
+          if (cancelled) return;
           console.error("Token exchange failed:", ex);
-          setError("sign_in_failed");
+          setError(ex.message || "sign_in_failed");
           setStatus("error");
+          // Strip ?code=... even on failure — a stale/consumed code
+          // left in the URL would otherwise be resubmitted on refresh
+          // and fail again with the same confusing result.
+          window.history.replaceState({}, "", COGNITO_REDIRECT_URI);
         });
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
 
-    // Case 3: plain page load, check for an existing stored session.
     const restored = loadStoredSession();
     if (restored) {
       setSession(restored);
