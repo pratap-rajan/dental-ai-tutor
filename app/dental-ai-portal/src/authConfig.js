@@ -42,7 +42,15 @@ export function buildAuthorizeUrl(identityProvider, codeChallenge) {
     redirect_uri: COGNITO_REDIRECT_URI,
     identity_provider: identityProvider, // "Google" or the exact OIDC provider name set in Cognito, e.g. "Microsoft"
     code_challenge: codeChallenge,
-    code_challenge_method: "S256"
+    code_challenge_method: "S256",
+    // Forces the account chooser to show every time, rather than
+    // silently reusing an existing browser session. Google shows this
+    // by default already; Microsoft does NOT — without this, Microsoft
+    // sign-in skips straight to whichever account is already active in
+    // the browser, giving no way to pick a different one (e.g. testing
+    // as admin vs. a non-admin account). Cognito forwards this param
+    // through to the underlying identity provider's own auth endpoint.
+    prompt: "select_account"
   });
   return `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
 }
