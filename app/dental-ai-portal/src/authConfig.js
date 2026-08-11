@@ -4,8 +4,16 @@
 // client, by design).
 export const COGNITO_DOMAIN = "https://eu-west-2dkcktuhbh.auth.eu-west-2.amazoncognito.com";
 export const COGNITO_CLIENT_ID = "qu9cshab6t3rodq4t63jvtapl";
-export const COGNITO_REDIRECT_URI = "https://planoreacademy.co.uk/";
-export const COGNITO_LOGOUT_REDIRECT_URI = "https://planoreacademy.co.uk/";
+// IMPORTANT: must be the www subdomain, not the bare root domain.
+// planoreacademy.co.uk (no www) is only reachable via GoDaddy's domain
+// forwarding (a browser redirect) to www.planoreacademy.co.uk, since
+// GoDaddy has no ANAME/ALIAS record type for the apex domain. The two
+// are DIFFERENT ORIGINS as far as sessionStorage is concerned — if the
+// PKCE verifier or session gets written on one and the app later loads
+// on the other, sessionStorage will always appear empty. Keeping every
+// auth URL consistently on www avoids that origin mismatch entirely.
+export const COGNITO_REDIRECT_URI = "https://www.planoreacademy.co.uk/";
+export const COGNITO_LOGOUT_REDIRECT_URI = "https://www.planoreacademy.co.uk/";
 
 // Where session tokens are cached in the browser between page loads.
 // sessionStorage (not localStorage) is used deliberately — it clears
