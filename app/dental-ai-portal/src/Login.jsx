@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { theme, fonts } from "./theme.js";
 import { buildAuthorizeUrl } from "./authConfig.js";
 import { preparePkceChallenge } from "./AuthContext.jsx";
@@ -11,6 +11,25 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
   const [googleHovered, setGoogleHovered] = useState(false);
   const [msHovered, setMsHovered] = useState(false);
   const [tcTileHovered, setTcTileHovered] = useState(false);
+
+  useEffect(() => {
+    // Fixes both buttons getting stuck disabled after clicking Back
+    // from Google/Microsoft's account chooser. window.location.href
+    // navigates away without unmounting this component, so if the
+    // browser restores this page from its back-forward cache (bfcache)
+    // rather than doing a fresh load, React's "starting" state comes
+    // back stuck at true with nothing to ever reset it. The pageshow
+    // event fires on both a normal load AND a bfcache restore —
+    // event.persisted tells us which — so this specifically catches
+    // the back/forward case and un-sticks the buttons.
+    function handlePageShow(event) {
+      if (event.persisted) {
+        setStarting(false);
+      }
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   async function handleProvider(providerName) {
     if (!tcAccepted || starting) return;
