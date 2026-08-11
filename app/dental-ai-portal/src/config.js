@@ -53,6 +53,26 @@ export const CASE_CATALOG = [
   {
     id: "case10-dry-mouth",
     label: "Case 10 — Dry mouth"
+  },
+  {
+    id: "case11-dry-socket",
+    label: "Case 11 — Dry socket"
+  },
+  {
+    id: "case12-impacted-tooth",
+    label: "Case 12 — Impacted tooth"
+  },
+  {
+    id: "case13-flabby-ridge",
+    label: "Case 13 — Flabby ridge"
+  },
+  {
+    id: "case14-fluoride-supplements",
+    label: "Case 14 — Fluoride supplements"
+  },
+  {
+    id: "case15-supernumerary-tooth",
+    label: "Case 15 — Supernumerary tooth"
   }
 ];
 
