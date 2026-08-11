@@ -166,7 +166,7 @@ export function AuthProvider({ children }) {
       // show the friendly "pending approval" screen instead of a
       // generic error box.
       const isDisabledAccount =
-        oauthErrorDescription && /not enabled/i.test(oauthErrorDescription);
+        oauthErrorDescription && /not enabled|is disabled/i.test(oauthErrorDescription);
 
       if (isDisabledAccount) {
         setStatus("pending_approval");
@@ -191,7 +191,7 @@ export function AuthProvider({ children }) {
           // The token exchange step can ALSO surface a disabled
           // account, depending on exactly when Cognito checks — cover
           // both places consistently, same detection logic.
-          const isDisabledAccount = /not enabled/i.test(ex.message || "");
+          const isDisabledAccount = /not enabled|is disabled/i.test(ex.message || "");
           if (isDisabledAccount) {
             setStatus("pending_approval");
           } else {
