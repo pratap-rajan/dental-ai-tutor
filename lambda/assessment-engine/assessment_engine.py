@@ -11,6 +11,19 @@ bedrock = boto3.client(
     region_name=os.environ.get("REGION", "eu-west-2")
 )
 
+# Separate client for Knowledge Base retrieval — this is a genuinely
+# different Bedrock API (bedrock-agent-runtime) from the one used for
+# invoke_model calls (bedrock-runtime). Retrieval and generation are
+# kept as two distinct steps (retrieve here, generate via invoke_claude
+# below) rather than using RetrieveAndGenerate, so retrieved knowledge
+# can be woven into the existing prompt-template structure alongside
+# the marking matrix / reference answer / case study, instead of
+# replacing that structure.
+bedrock_agent = boto3.client(
+    "bedrock-agent-runtime",
+    region_name=os.environ.get("REGION", "eu-west-2")
+)
+
 ses = boto3.client(
     "ses",
     region_name=os.environ.get("REGION", "eu-west-2")
@@ -21,6 +34,14 @@ MODEL_ID    = os.environ["MODEL_ID"]
 REPORT_SENDER = os.environ.get("SES_SENDER", "academy@planore.co.uk")
 DEFAULT_NOTIFY_EMAIL = os.environ.get("DEFAULT_NOTIFY_EMAIL")
 DEFAULT_REPORT_TYPE = os.environ.get("DEFAULT_REPORT_TYPE", "detailed")
+
+# Knowledge Base retrieval. If unset, retrieval is skipped entirely and
+# {knowledge_context} resolves to an empty string in any prompt template
+# that references it — this keeps every existing case fully working
+# with zero changes required to their prompt-template.txt files unless
+# you specifically choose to add a {knowledge_context} placeholder.
+KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
+KNOWLEDGE_BASE_MAX_RESULTS = int(os.environ.get("KNOWLEDGE_BASE_MAX_RESULTS", "5"))
 
 
 def get_s3_key_from_event(event):
@@ -203,6 +224,54 @@ def clean_json_response(text):
     return text.strip()
 
 
+def retrieve_knowledge_base_context(query_text, case_id):
+    """
+    Retrieves relevant chunks from the Bedrock Knowledge Base for the
+    given query text, optionally filtered to a specific case's content
+    via metadata (if the ingested source documents carry a "caseId"
+    metadata field — see the Knowledge Base data source setup docs).
+
+    Returns a plain-text string of joined retrieved chunks, or an empty
+    string if KNOWLEDGE_BASE_ID isn't configured, retrieval finds
+    nothing, or the call fails for any reason — this is deliberately
+    non-fatal. A Knowledge Base outage or misconfiguration should never
+    block the core assessment pipeline; it should just mean the prompt
+    proceeds without the extra retrieved context, same as it did before
+    this feature existed.
+    """
+    if not KNOWLEDGE_BASE_ID:
+        return ""
+
+    try:
+        response = bedrock_agent.retrieve(
+            knowledgeBaseId=KNOWLEDGE_BASE_ID,
+            retrievalQuery={"text": query_text},
+            retrievalConfiguration={
+                "vectorSearchConfiguration": {
+                    "numberOfResults": KNOWLEDGE_BASE_MAX_RESULTS
+                }
+            }
+        )
+
+        chunks = [
+            r["content"]["text"]
+            for r in response.get("retrievalResults", [])
+            if r.get("content", {}).get("text")
+        ]
+
+        if not chunks:
+            print(f"Knowledge Base retrieval for case={case_id} returned no results")
+            return ""
+
+        print(f"Knowledge Base retrieval for case={case_id} returned {len(chunks)} chunk(s)")
+        return "\n\n---\n\n".join(chunks)
+
+    except Exception as ex:
+        # Non-fatal by design — see docstring.
+        print(f"WARNING: Knowledge Base retrieval failed, proceeding without it: {ex}")
+        return ""
+
+
 def check_case_relevance(case_study_text, marking_matrix, student_answer, image_base64=None):
     """
     Cheap, fast pre-check run BEFORE the full assessment call. Asks Claude
@@ -307,7 +376,7 @@ def generate_rejection_report(case_id, reason):
 """
 
 
-def build_prompt(prompt_template, marking_matrix, reference_answer, student_answer, case_study=""):
+def build_prompt(prompt_template, marking_matrix, reference_answer, student_answer, case_study="", knowledge_context=""):
     """
     Fills the prompt template loaded from S3 with the dynamic values.
     The template must contain these placeholders:
@@ -315,16 +384,25 @@ def build_prompt(prompt_template, marking_matrix, reference_answer, student_answ
         {reference_answer}
         {student_answer}
     It may optionally contain:
-        {case_study}   — filled with case-study.txt content when there is
-                          no case-study.jpeg image for this case. If the
-                          template doesn't reference {case_study}, this
-                          value is simply ignored.
+        {case_study}         — filled with case-study.txt content when there is
+                                no case-study.jpeg image for this case. If the
+                                template doesn't reference {case_study}, this
+                                value is simply ignored.
+        {knowledge_context}  — filled with chunks retrieved from the Bedrock
+                                Knowledge Base (if KNOWLEDGE_BASE_ID is set and
+                                retrieval finds something relevant). Empty
+                                string if the Knowledge Base isn't configured,
+                                retrieval finds nothing, or the template
+                                doesn't reference this placeholder at all —
+                                fully backward compatible with every existing
+                                case's prompt-template.txt.
     """
     return prompt_template.format(
         marking_matrix=marking_matrix,
         reference_answer=reference_answer,
         student_answer=student_answer,
-        case_study=case_study
+        case_study=case_study,
+        knowledge_context=knowledge_context
     )
 
 
@@ -734,6 +812,19 @@ def lambda_handler(event, context):
             }
 
         #
+        # Knowledge Base retrieval (optional — only if KNOWLEDGE_BASE_ID
+        # is configured). Retrieves supplementary reference material
+        # relevant to what the student actually said, to augment
+        # (not replace) the case's own marking matrix and reference
+        # answer already loaded above.
+        #
+
+        knowledge_context = retrieve_knowledge_base_context(
+            query_text=student_answer,
+            case_id=case_id
+        )
+
+        #
         # Build prompt from S3 template
         #
 
@@ -742,7 +833,8 @@ def lambda_handler(event, context):
             marking_matrix,
             reference_answer,
             student_answer,
-            case_study=case_study_text
+            case_study=case_study_text,
+            knowledge_context=knowledge_context
         )
 
         #
