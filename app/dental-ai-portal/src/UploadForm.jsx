@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { CASE_CATALOG, MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, RECAPTCHA_SITE_KEY } from "./config.js";
+import { CASE_CATALOG, MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, RECAPTCHA_SITE_KEY, STATION_TYPES, DEFAULT_STATION_TYPE } from "./config.js";
 import { requestUploadUrl, uploadFileToS3 } from "./api.js";
 import { theme, fonts } from "./theme.js";
 import CaseSelect from "./caseselect.jsx";
@@ -7,6 +7,7 @@ import CaseSelect from "./caseselect.jsx";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
+  const [stationType, setStationType] = useState(DEFAULT_STATION_TYPE);
   const [caseId, setCaseId] = useState("");
   const [email, setEmail] = useState(studentEmail || "");
   const [reportType, setReportType] = useState("detailed");
@@ -65,6 +66,19 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
     setError("");
     setFile(selected || null);
   }
+
+  function handleStationTypeChange(nextType) {
+    const type = STATION_TYPES.find((t) => t.id === nextType);
+    if (!type || !type.enabled || submitting) return;
+    setStationType(nextType);
+    // Clear the case selection on tab switch — a case selected under
+    // one station type is never valid under another, so leaving it
+    // set would let a student submit against a case they can no
+    // longer see in the dropdown.
+    setCaseId("");
+  }
+
+  const filteredCases = CASE_CATALOG.filter((c) => c.stationType === stationType);
 
   function handleDrop(e) {
     e.preventDefault();
@@ -149,10 +163,33 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
             }}
           />
 
+          <div style={styles.stationTabs}>
+            {STATION_TYPES.map((type) => {
+              const active = type.id === stationType;
+              return (
+                <button
+                  key={type.id}
+                  type="button"
+                  style={{
+                    ...styles.stationTab,
+                    ...(active ? styles.stationTabActive : {}),
+                    ...(!type.enabled ? styles.stationTabDisabled : {})
+                  }}
+                  onClick={() => handleStationTypeChange(type.id)}
+                  disabled={!type.enabled || submitting}
+                  title={!type.enabled ? "Coming soon" : undefined}
+                >
+                  {type.label}
+                  {!type.enabled && <span style={styles.comingSoonBadge}>Soon</span>}
+                </button>
+              );
+            })}
+          </div>
+
           <div style={styles.field}>
             <label style={styles.label} htmlFor="case-select">Case</label>
             <CaseSelect
-              options={CASE_CATALOG}
+              options={filteredCases}
               value={caseId}
               onChange={setCaseId}
               disabled={submitting}
@@ -333,6 +370,53 @@ const styles = {
     transition: "opacity 0.3s ease"
   },
   field: { position: "relative", marginBottom: "1.1rem" },
+  stationTabs: {
+    position: "relative",
+    display: "flex",
+    gap: 8,
+    marginBottom: "1.1rem",
+    padding: 4,
+    background: "rgba(255,255,255,0.02)",
+    border: `1px solid ${theme.navyLighter}`,
+    borderRadius: 10
+  },
+  stationTab: {
+    flex: 1,
+    position: "relative",
+    padding: "9px 0",
+    borderRadius: 7,
+    border: "1px solid transparent",
+    background: "transparent",
+    color: theme.slateLight,
+    fontSize: 13.5,
+    fontWeight: 600,
+    fontFamily: fonts.body,
+    cursor: "pointer",
+    letterSpacing: "0.02em",
+    transition: "background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease"
+  },
+  stationTabActive: {
+    background: "rgba(114,212,196,0.10)",
+    border: `1.5px solid ${theme.ctaMint}`,
+    color: theme.ctaMint,
+    boxShadow: `0 0 20px -6px ${theme.ctaMint}99`
+  },
+  stationTabDisabled: {
+    color: theme.slateLight,
+    opacity: 0.4,
+    cursor: "not-allowed"
+  },
+  comingSoonBadge: {
+    marginLeft: 6,
+    fontSize: 9,
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    color: theme.slateLight,
+    background: "rgba(255,255,255,0.06)",
+    borderRadius: 20,
+    padding: "1px 6px",
+    verticalAlign: "middle"
+  },
   label: { fontSize: 13.5, fontWeight: 600, color: theme.mint, opacity: 0.85, display: "block", marginBottom: 6 },
   input: {
     width: "100%",
