@@ -73,6 +73,26 @@ export const CASE_CATALOG = [
   {
     id: "case15-supernumerary-tooth",
     label: "Case 15 — Supernumerary tooth"
+  },
+  {
+    id: "case16-sedation",
+    label: "Case 16 — Sedation options"
+  },
+  {
+    id: "case17-denture-stomatitis",
+    label: "Case 17 — Denture stomatitis"
+  },
+  {
+    id: "case18-halls-technique",
+    label: "Case 18 — Hall technique"
+  },
+  {
+    id: "case19-lipcut-lip-burns",
+    label: "Case 19 — Lip cut / lip burns"
+  },
+  {
+    id: "case20-mpds",
+    label: "Case 20 — Myofascial pain dysfunction syndrome"
   }
 ];
 
