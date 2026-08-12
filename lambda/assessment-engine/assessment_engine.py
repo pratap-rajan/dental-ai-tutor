@@ -304,14 +304,31 @@ MARKING MATRIX (topics this case is testing)
 STUDENT'S SPOKEN ANSWER (transcribed)
 {student_answer}
 
+IMPORTANT: if the case study above describes MULTIPLE numbered/lettered
+scenario variants (e.g. "Scenario 1" and "Scenario 2"), these are ALL
+equally valid, intended versions of this SAME case — a student may be
+given any one of them. The student's answer should be marked relevant
+if it matches ANY ONE of the listed scenario variants, even if it does
+not match all of them, and even if the variants differ significantly in
+patient details, presenting complaint, or which specific topics need to
+be covered (e.g. one variant may not require LA to be discussed at all
+while another requires LA, IV sedation, AND GA — both are still this
+same case). Do not mark a transcript as irrelevant merely because it
+matches a different variant than another one described in the case
+study, or because it covers a different subset of the variants'
+combined topics — only mark it irrelevant if it fails to match ANY of
+the listed variants.
+
 Question: Does the student's answer describe an attempt to manage THIS
-specific clinical scenario — even if done poorly, incompletely, or with
-significant clinical errors? A poor or incomplete attempt at the RIGHT
-scenario should be marked relevant. Only mark it as NOT relevant if the
-transcript is clearly about a different clinical scenario entirely
-(e.g. a different presenting complaint, a different type of
-consultation, or unrelated content) — the kind of mismatch that would
-happen if a recording for a different case was uploaded by mistake.
+specific clinical scenario (i.e. any one of its variants, if multiple
+are listed) — even if done poorly, incompletely, or with significant
+clinical errors? A poor or incomplete attempt at the RIGHT scenario (or
+any one of its valid variants) should be marked relevant. Only mark it
+as NOT relevant if the transcript is clearly about a different clinical
+scenario entirely (e.g. a different presenting complaint, a different
+type of consultation, or unrelated content) — the kind of mismatch that
+would happen if a recording for a different case was uploaded by
+mistake.
 
 Return ONLY valid JSON in this exact shape, nothing else:
 {{
