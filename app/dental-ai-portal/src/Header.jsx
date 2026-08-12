@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { theme, fonts } from "./theme.js";
 
 export default function Header({ onCtaClick, studentName, onSignOut }) {
+  const [signOutHovered, setSignOutHovered] = useState(false);
+
   return (
     <header style={styles.header}>
       <div style={styles.inner}>
@@ -13,7 +16,20 @@ export default function Header({ onCtaClick, studentName, onSignOut }) {
           {studentName && (
             <div style={styles.identity}>
               <span style={styles.studentName}>{studentName}</span>
-              <button style={styles.signOutButton} onClick={onSignOut}>Sign out</button>
+              <button
+                style={{
+                  ...styles.signOutButton,
+                  borderColor: signOutHovered ? theme.tealGlow : theme.tealGlow + "88",
+                  color: theme.tealGlow,
+                  background: signOutHovered ? "rgba(99,209,230,0.14)" : "rgba(99,209,230,0.06)",
+                  boxShadow: signOutHovered ? `0 0 18px -4px ${theme.tealGlow}99` : "none"
+                }}
+                onMouseEnter={() => setSignOutHovered(true)}
+                onMouseLeave={() => setSignOutHovered(false)}
+                onClick={onSignOut}
+              >
+                Sign out
+              </button>
             </div>
           )}
           <button style={styles.cta} onClick={onCtaClick}>
@@ -72,23 +88,24 @@ const styles = {
     gap: 10
   },
   studentName: {
-    color: theme.slateLight,
+    color: theme.mint,
     fontSize: 13,
+    fontWeight: 500,
     whiteSpace: "nowrap",
     maxWidth: 160,
     overflow: "hidden",
     textOverflow: "ellipsis"
   },
   signOutButton: {
-    background: "none",
-    border: `1px solid ${theme.navyLighter}`,
-    color: theme.slateLight,
+    border: "1.5px solid",
     fontSize: 12,
-    padding: "5px 10px",
+    fontWeight: 500,
+    padding: "5px 12px",
     borderRadius: 6,
     cursor: "pointer",
     fontFamily: fonts.body,
-    whiteSpace: "nowrap"
+    whiteSpace: "nowrap",
+    transition: "background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease"
   },
   cta: {
     background: theme.ctaMint,
