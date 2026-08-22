@@ -11,14 +11,6 @@ bedrock = boto3.client(
     region_name=os.environ.get("REGION", "eu-west-2")
 )
 
-# Separate client for Knowledge Base retrieval — this is a genuinely
-# different Bedrock API (bedrock-agent-runtime) from the one used for
-# invoke_model calls (bedrock-runtime). Retrieval and generation are
-# kept as two distinct steps (retrieve here, generate via invoke_claude
-# below) rather than using RetrieveAndGenerate, so retrieved knowledge
-# can be woven into the existing prompt-template structure alongside
-# the marking matrix / reference answer / case study, instead of
-# replacing that structure.
 bedrock_agent = boto3.client(
     "bedrock-agent-runtime",
     region_name=os.environ.get("REGION", "eu-west-2")
@@ -35,22 +27,17 @@ REPORT_SENDER = os.environ.get("SES_SENDER", "academy@planore.co.uk")
 DEFAULT_NOTIFY_EMAIL = os.environ.get("DEFAULT_NOTIFY_EMAIL")
 DEFAULT_REPORT_TYPE = os.environ.get("DEFAULT_REPORT_TYPE", "detailed")
 
-# Knowledge Base retrieval. If unset, retrieval is skipped entirely and
-# {knowledge_context} resolves to an empty string in any prompt template
-# that references it — this keeps every existing case fully working
-# with zero changes required to their prompt-template.txt files unless
-# you specifically choose to add a {knowledge_context} placeholder.
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
 KNOWLEDGE_BASE_MAX_RESULTS = int(os.environ.get("KNOWLEDGE_BASE_MAX_RESULTS", "5"))
 
+# SCR-only timing gate. Hard reject beyond MAX_SCR_RECORDING_SECONDS;
+# between SCR_IDEAL_MAX_SECONDS and the hard limit, still scored
+# normally but flagged with an advisory note in the report.
+MAX_SCR_RECORDING_SECONDS = int(os.environ.get("MAX_SCR_RECORDING_SECONDS", "720"))  # 12 min
+SCR_IDEAL_MAX_SECONDS     = int(os.environ.get("SCR_IDEAL_MAX_SECONDS", "600"))       # 10 min
+
 
 def get_s3_key_from_event(event):
-    """
-    If this Lambda was triggered automatically by a transcript landing
-    in S3 (directly via S3 Event Notification, or via EventBridge),
-    returns the object key. Returns None if the event doesn't look like
-    an S3 notification (e.g. a manual/Step Functions invocation).
-    """
     try:
         records = event.get("Records")
         if records:
@@ -58,29 +45,16 @@ def get_s3_key_from_event(event):
             return urllib.parse.unquote_plus(key)
     except (KeyError, IndexError, TypeError):
         pass
-
-    # EventBridge S3 notification shape
     try:
         detail = event.get("detail", {})
         key = detail["object"]["key"]
         return urllib.parse.unquote_plus(key)
     except (KeyError, TypeError):
         pass
-
     return None
 
 
 def read_upload_metadata(bucket, case_id, student_name):
-    """
-    Reads the optional metadata sidecar file written at upload time by the
-    presigned-URL Lambda, at:
-        student-uploads/{caseId}/{studentName}.metadata.json
-    Expected shape: {"emailId": "...", "reportType": "detailed"|"basic"}
-    Returns {} if the sidecar doesn't exist — automated invocations then
-    fall back to DEFAULT_NOTIFY_EMAIL / DEFAULT_REPORT_TYPE as before, so
-    this is fully backward compatible with uploads that don't create one
-    (e.g. manual S3 console uploads or older client versions).
-    """
     key = f"student-uploads/{case_id}/{student_name}.metadata.json"
     raw = try_read_s3_text(BUCKET_NAME, key)
     if not raw:
@@ -95,29 +69,6 @@ def read_upload_metadata(bucket, case_id, student_name):
 
 
 def resolve_input(event):
-    """
-    Works out caseId, student_json_key, emailId, and reportType regardless
-    of how this Lambda was triggered:
-
-    1. Manual / Step Functions invocation — event already contains
-       "caseId", "student_json_key", "emailId", optionally "reportType".
-
-    2. Automated trigger — event is a raw S3 Event Notification or
-       EventBridge "Object Created" event fired when a student's
-       transcript JSON lands under transcripts/{caseId}/{student}.json.
-       caseId and student_json_key are derived from the object key.
-       emailId and reportType are read from the upload metadata sidecar
-       file (student-uploads/{caseId}/{student}.metadata.json), written
-       by the presigned-URL Lambda when the student originally uploaded
-       via the React portal. If that sidecar doesn't exist, falls back
-       to DEFAULT_NOTIFY_EMAIL / DEFAULT_REPORT_TYPE.
-
-    reportType is either "detailed" (full report, including the
-    per-criterion breakdown table) or "basic" (score, grade, strengths,
-    areas for improvement, and final summary only). Any other/missing
-    value falls back to "detailed".
-    """
-    # Manual / Step Functions shape takes priority if present
     if event.get("student_json_key"):
         report_type = event.get("reportType") or DEFAULT_REPORT_TYPE
         return (
@@ -127,7 +78,6 @@ def resolve_input(event):
             report_type if report_type in ("detailed", "basic") else "detailed"
         )
 
-    # Automated S3 / EventBridge shape
     key = get_s3_key_from_event(event)
     if not key:
         raise Exception(
@@ -160,22 +110,16 @@ def resolve_input(event):
 
 
 def read_s3_text(bucket, key):
-    """Reads a plain text file from S3 and decodes it."""
     response = s3.get_object(Bucket=bucket, Key=key)
     return response["Body"].read().decode("utf-8")
 
 
 def read_s3_image_base64(bucket, key):
-    """Reads an image from S3 and returns it as a base64 string."""
     response = s3.get_object(Bucket=bucket, Key=key)
     return base64.b64encode(response["Body"].read()).decode("utf-8")
 
 
 def try_read_s3_text(bucket, key):
-    """
-    Attempts to read an optional text file from S3.
-    Returns None if the object does not exist. Any other S3 error still raises.
-    """
     try:
         return read_s3_text(bucket, key)
     except s3.exceptions.NoSuchKey:
@@ -189,11 +133,6 @@ def try_read_s3_text(bucket, key):
 
 
 def try_read_s3_image_base64(bucket, key):
-    """
-    Attempts to read an optional case image from S3.
-    Returns None if the object does not exist, so text-only cases work
-    without a case-study.jpeg file. Any other S3 error still raises.
-    """
     try:
         return read_s3_image_base64(bucket, key)
     except s3.exceptions.NoSuchKey:
@@ -206,14 +145,62 @@ def try_read_s3_image_base64(bucket, key):
         raise
 
 
+def load_case_images(bucket, case_id):
+    """
+    Loads any number of images under cases/{case_id}/case-study-images/
+    (sorted by key — use filenames like 01-..., 02-... for predictable
+    ordering), for cases needing text + one-or-more images together
+    (e.g. SCR). Falls back to the legacy single cases/{case_id}/case-study.jpeg
+    only if that folder is empty, so none of the existing OSCE cases
+    need any changes.
+
+    Returns a list of base64 strings (possibly empty).
+    """
+    images = []
+    prefix = f"cases/{case_id}/case-study-images/"
+    resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    for obj in sorted(resp.get("Contents", []), key=lambda o: o["Key"]):
+        if obj["Key"].endswith("/"):
+            continue
+        try:
+            images.append(read_s3_image_base64(bucket, obj["Key"]))
+        except Exception as ex:
+            print(f"WARNING: could not read case image {obj['Key']}: {ex}")
+
+    if images:
+        print(f"Loaded {len(images)} case image(s) from {prefix}")
+        return images
+
+    legacy = try_read_s3_image_base64(bucket, f"cases/{case_id}/case-study.jpeg")
+    return [legacy] if legacy else []
+
+
 def extract_transcript(transcribe_json_text):
     """Extracts the raw transcript from an Amazon Transcribe JSON structure."""
     data = json.loads(transcribe_json_text)
     return data["results"]["transcripts"][0]["transcript"]
 
 
+def extract_transcript_and_duration(transcribe_json_text):
+    """
+    Extracts both the transcript text and total spoken duration (in
+    seconds) from a raw Amazon Transcribe JSON result. Duration is the
+    end_time of the last timed item — Transcribe already returns this
+    on every item, it just wasn't being read before. Used for the
+    STUDENT's transcript only; the reference answer keeps using
+    extract_transcript() since it doesn't need a duration check.
+    """
+    data = json.loads(transcribe_json_text)
+    transcript = data["results"]["transcripts"][0]["transcript"]
+    duration = 0.0
+    for item in reversed(data["results"].get("items", [])):
+        if "end_time" in item:
+            duration = float(item["end_time"])
+            break
+    return transcript, duration
+
+
 def clean_json_response(text):
-    """Strips markdown code fences from the LLM response."""
     text = text.strip()
     if text.startswith("```json"):
         text = text[7:]
@@ -225,23 +212,8 @@ def clean_json_response(text):
 
 
 def retrieve_knowledge_base_context(query_text, case_id):
-    """
-    Retrieves relevant chunks from the Bedrock Knowledge Base for the
-    given query text, optionally filtered to a specific case's content
-    via metadata (if the ingested source documents carry a "caseId"
-    metadata field — see the Knowledge Base data source setup docs).
-
-    Returns a plain-text string of joined retrieved chunks, or an empty
-    string if KNOWLEDGE_BASE_ID isn't configured, retrieval finds
-    nothing, or the call fails for any reason — this is deliberately
-    non-fatal. A Knowledge Base outage or misconfiguration should never
-    block the core assessment pipeline; it should just mean the prompt
-    proceeds without the extra retrieved context, same as it did before
-    this feature existed.
-    """
     if not KNOWLEDGE_BASE_ID:
         return ""
-
     try:
         response = bedrock_agent.retrieve(
             knowledgeBaseId=KNOWLEDGE_BASE_ID,
@@ -252,43 +224,25 @@ def retrieve_knowledge_base_context(query_text, case_id):
                 }
             }
         )
-
         chunks = [
             r["content"]["text"]
             for r in response.get("retrievalResults", [])
             if r.get("content", {}).get("text")
         ]
-
         if not chunks:
             print(f"Knowledge Base retrieval for case={case_id} returned no results")
             return ""
-
         print(f"Knowledge Base retrieval for case={case_id} returned {len(chunks)} chunk(s)")
         return "\n\n---\n\n".join(chunks)
-
     except Exception as ex:
-        # Non-fatal by design — see docstring.
         print(f"WARNING: Knowledge Base retrieval failed, proceeding without it: {ex}")
         return ""
 
 
-def check_case_relevance(case_study_text, marking_matrix, student_answer, image_base64=None):
+def check_case_relevance(case_study_text, marking_matrix, student_answer, images_base64=None):
     """
-    Cheap, fast pre-check run BEFORE the full assessment call. Asks Claude
-    a single narrow question: does this student transcript actually
-    describe an attempt at THIS case's scenario, or is it a clearly
-    different clinical scenario (e.g. the wrong recording uploaded to the
-    wrong case)?
-
-    This is deliberately a separate call from the main scoring prompt —
-    folding this check into the scoring prompt is exactly what allowed
-    the original bug: the scoring prompt is designed to award partial
-    credit and note "missed" items, so a completely mismatched transcript
-    just reads as an extremely poor attempt rather than a wrong upload.
-    A dedicated relevance check has no scoring incentive and can say
-    "no" cleanly.
-
-    Returns a dict: {"relevant": bool, "reason": str}
+    images_base64 is now a LIST (was a single optional image before) —
+    pass [] or None for text-only cases.
     """
     check_prompt = f"""You are checking whether a student's spoken exam
 answer actually corresponds to a specific clinical case, before any
@@ -296,7 +250,7 @@ scoring happens. This is a relevance check ONLY — do not evaluate
 quality, do not award marks, do not identify errors or omissions.
 
 CASE STUDY / SCENARIO
-{case_study_text if case_study_text else "(see attached image)"}
+{case_study_text if case_study_text else "(see attached image(s))"}
 
 MARKING MATRIX (topics this case is testing)
 {marking_matrix}
@@ -337,7 +291,7 @@ Return ONLY valid JSON in this exact shape, nothing else:
 }}
 """
 
-    result_text = invoke_claude(check_prompt, image_base64=image_base64)
+    result_text = invoke_claude(check_prompt, images_base64=images_base64)
     result = json.loads(clean_json_response(result_text))
 
     return {
@@ -347,11 +301,6 @@ Return ONLY valid JSON in this exact shape, nothing else:
 
 
 def generate_rejection_report(case_id, reason):
-    """
-    Builds a short, honest HTML report for when the relevance check
-    fails — clearly explaining that this recording does not appear to
-    match the selected case, rather than presenting a misleading score.
-    """
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -393,27 +342,56 @@ def generate_rejection_report(case_id, reason):
 """
 
 
+def generate_time_limit_rejection_report(case_id, duration_seconds, max_seconds):
+    """
+    Honest, non-scoring HTML report for when an SCR recording exceeds
+    the hard time limit — styled consistently with generate_rejection_report().
+    """
+    minutes = duration_seconds / 60
+    max_minutes = max_seconds / 60
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    body {{
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f8fafc; color: #1e293b; margin: 0; padding: 40px;
+    }}
+    .box {{
+        max-width: 640px; margin: 0 auto; background: #ffffff;
+        border: 1px solid #fecaca; border-left: 4px solid #dc2626;
+        border-radius: 8px; padding: 30px;
+    }}
+    h1 {{ font-size: 18pt; color: #991b1b; margin: 0 0 12px; }}
+    p {{ font-size: 11pt; line-height: 1.6; color: #334155; }}
+    .reason {{ background: #fef2f2; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 10.5pt; color: #7f1d1d; }}
+</style>
+</head>
+<body>
+    <div class="box">
+        <h1>Unable to Assess — Recording Exceeds Time Limit</h1>
+        <p>
+            This recording could not be scored against <strong>{case_id}</strong>.
+            The Structured Clinical Reasoning (SCR) exam format allows a
+            maximum of {max_minutes:.0f} minutes per case.
+        </p>
+        <div class="reason">
+            Your recording was {minutes:.1f} minutes long, which exceeds
+            the {max_minutes:.0f}-minute limit for this case type.
+        </div>
+        <p>
+            Please re-record your answer within the allowed time and
+            re-submit under the same case selection.
+        </p>
+        <p>No score has been generated for this attempt.</p>
+    </div>
+</body>
+</html>
+"""
+
+
 def build_prompt(prompt_template, marking_matrix, reference_answer, student_answer, case_study="", knowledge_context=""):
-    """
-    Fills the prompt template loaded from S3 with the dynamic values.
-    The template must contain these placeholders:
-        {marking_matrix}
-        {reference_answer}
-        {student_answer}
-    It may optionally contain:
-        {case_study}         — filled with case-study.txt content when there is
-                                no case-study.jpeg image for this case. If the
-                                template doesn't reference {case_study}, this
-                                value is simply ignored.
-        {knowledge_context}  — filled with chunks retrieved from the Bedrock
-                                Knowledge Base (if KNOWLEDGE_BASE_ID is set and
-                                retrieval finds something relevant). Empty
-                                string if the Knowledge Base isn't configured,
-                                retrieval finds nothing, or the template
-                                doesn't reference this placeholder at all —
-                                fully backward compatible with every existing
-                                case's prompt-template.txt.
-    """
     return prompt_template.format(
         marking_matrix=marking_matrix,
         reference_answer=reference_answer,
@@ -423,21 +401,21 @@ def build_prompt(prompt_template, marking_matrix, reference_answer, student_answ
     )
 
 
-def invoke_claude(prompt, image_base64=None):
+def invoke_claude(prompt, images_base64=None):
     """
-    Invokes the Claude model via Bedrock with a text prompt, and an
-    optional case image. If image_base64 is None, the request is sent
-    as text-only — used for cases that have no case-study.jpeg.
+    images_base64 is now a LIST — pass [] or None for text-only cases,
+    one item for a single-image OSCE case, or several for a multi-image
+    SCR case. Order in the list is the order sent to the model.
     """
     content = []
 
-    if image_base64:
+    for img in (images_base64 or []):
         content.append({
             "type": "image",
             "source": {
                 "type": "base64",
                 "media_type": "image/jpeg",
-                "data": image_base64
+                "data": img
             }
         })
 
@@ -467,16 +445,9 @@ def invoke_claude(prompt, image_base64=None):
 
 def generate_html_report(assessment, report_key, report_type="detailed"):
     """
-    Constructs a responsive, print-ready HTML report from the assessment JSON.
-
-    report_type:
-        "detailed" (default) — full report including the per-criterion
-                                breakdown table.
-        "basic"              — score, grade, strengths, areas for
-                                improvement, and final summary only.
-                                Skips the criteria breakdown table and
-                                the confidence/delivery section, which
-                                are the most granular/repetitive parts.
+    UNCHANGED — the existing OSCE per-question report. Still used
+    whenever assessment_type is "OSCE" (the default for all 10
+    existing cases).
     """
     table_rows = ""
     for criterion in assessment.get("criteria", []):
@@ -644,8 +615,192 @@ def generate_html_report(assessment, report_key, report_type="detailed"):
 """
 
 
+def generate_html_report_scr(assessment, report_key, case_id, timing_advisory=None):
+    """
+    NEW — SCR report: domain-level results table, case summary table
+    (GDC codes + result), per-domain feedback cards, areas for
+    improvement, confidence/delivery, and a GDC code glossary table at
+    the end (built from assessment["code_glossary"], which Claude
+    populates using ONLY the definitions supplied in the marking
+    matrix — see prompt-template.txt).
+    """
+    domains = assessment.get("domains", [])
+    case_total = assessment.get("case_total", 0)
+    case_max = assessment.get("case_max", 16)
+    case_result = assessment.get("case_result", "Did Not Meet Standard")
+    result_class = "result-met" if case_result == "Met Standard" else "result-not-met"
+
+    domain_rows = ""
+    for d in domains:
+        d_result = "Met Standard" if d.get("score", 0) >= 3 else "Did Not Meet Standard"
+        d_class = "result-met" if d_result == "Met Standard" else "result-not-met"
+        domain_rows += f"""
+        <tr>
+            <td>{d.get('name', 'N/A')}</td>
+            <td class="{d_class}">{d_result}</td>
+        </tr>"""
+
+    all_codes = sorted(set(code for d in domains for code in d.get("codes_assessed", [])))
+    codes_str = ", ".join(all_codes)
+
+    feedback_cards = ""
+    for i, d in enumerate(domains, start=1):
+        score = d.get("score", 0)
+        score_class = "met" if score >= 3 else "not-met"
+        result_label = "Met Standard" if score >= 3 else "Did Not Meet Standard"
+        feedback_cards += f"""
+    <div class="domain-feedback">
+        <div class="domain-feedback-title">{i}. {d.get('name', 'N/A')}</div>
+        <div class="domain-feedback-score {score_class}">Score: {score} / 4 — {result_label}</div>
+        <p>{d.get('feedback', '')}</p>
+    </div>"""
+
+    strengths_list = "".join(f"<li>{s}</li>" for s in assessment.get("strengths", []))
+    improvements_list = "".join(f"<li>{i}</li>" for i in assessment.get("areas_for_improvement", []))
+
+    confidence = assessment.get("confidence_assessment", {})
+
+    timing_banner = f"""
+    <div class="advisory-banner">
+        <strong>Timing note:</strong> {timing_advisory} This is advisory only and did not affect your score.
+    </div>""" if timing_advisory else ""
+
+    glossary_rows = ""
+    for entry in assessment.get("code_glossary", []):
+        glossary_rows += f"""
+        <tr>
+            <td class="code-cell">{entry.get('code', '')}</td>
+            <td>{entry.get('meaning', '')}</td>
+        </tr>"""
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    @page {{ size: A4; margin: 20mm 15mm 20mm 15mm; background-color: #f8fafc; }}
+    * {{ box-sizing: border-box; }}
+    body {{
+        margin: 0; padding: 0;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        color: #1e293b; line-height: 1.5; font-size: 10pt;
+        background-color: #f8fafc;
+    }}
+    .page {{ max-width: 780px; margin: 0 auto; padding: 30px 20px; }}
+    .header-container {{ border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }}
+    .header-table {{ display: table; width: 100%; }}
+    .header-cell {{ display: table-cell; vertical-align: middle; }}
+    h1 {{ font-size: 20pt; color: #0f172a; margin: 0 0 5px 0; font-weight: 700; letter-spacing: -0.5px; }}
+    .subtitle {{ font-size: 10pt; color: #0284c7; margin: 0; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }}
+    .meta-box {{ background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 15px; margin-bottom: 20px; display: table; width: 100%; }}
+    .meta-col {{ display: table-cell; width: 25%; }}
+    .meta-label {{ font-size: 8pt; color: #64748b; text-transform: uppercase; margin-bottom: 2px; font-weight: 600; }}
+    .meta-value {{ font-size: 10pt; font-weight: 600; color: #334155; }}
+    .advisory-banner {{ background-color: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 9.5pt; color: #78350f; }}
+    .advisory-banner strong {{ color: #92400e; }}
+    h2 {{ font-size: 13pt; color: #0f172a; margin: 24px 0 10px; font-weight: 700; }}
+    .domain-table, .case-table, .glossary-table {{ width: 100%; border-collapse: collapse; margin-bottom: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }}
+    .domain-table th, .case-table th, .glossary-table th {{ background-color: #f1f5f9; text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.5px; color: #475569; padding: 10px 14px; font-weight: 700; }}
+    .domain-table td, .case-table td, .glossary-table td {{ padding: 10px 14px; font-size: 9.5pt; border-top: 1px solid #e2e8f0; vertical-align: top; }}
+    .glossary-table td {{ font-size: 9pt; color: #334155; }}
+    .code-cell {{ font-weight: 700; color: #0f172a; white-space: nowrap; }}
+    .result-met {{ color: #15803d; font-weight: 700; }}
+    .result-not-met {{ color: #b91c1c; font-weight: 700; }}
+    .case-total-row td {{ background-color: #f8fafc; font-weight: 700; }}
+    .domain-feedback {{ background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }}
+    .domain-feedback-title {{ font-weight: 700; font-size: 10.5pt; color: #0f172a; margin-bottom: 4px; }}
+    .domain-feedback-score {{ font-size: 9pt; font-weight: 700; margin-bottom: 8px; }}
+    .domain-feedback-score.met {{ color: #0284c7; }}
+    .domain-feedback-score.not-met {{ color: #b91c1c; }}
+    .domain-feedback p {{ margin: 0; font-size: 9.5pt; color: #334155; }}
+    .feedback-box {{ background: #f8fafc; border-radius: 6px; padding: 12px 16px; }}
+    ul {{ margin: 0; padding-left: 18px; }}
+    li {{ font-size: 9.5pt; color: #334155; margin-bottom: 6px; }}
+    .confidence-box {{ background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; }}
+</style>
+</head>
+<body>
+<div class="page">
+
+    <div class="header-container">
+        <div class="header-table">
+            <div class="header-cell">
+                <h1>Structured Clinical Reasoning Report</h1>
+                <p class="subtitle">Plan Ore Academy &middot; ORE Buddy</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="meta-box">
+        <div class="meta-col">
+            <div class="meta-label">Case</div>
+            <div class="meta-value">{case_id}</div>
+        </div>
+        <div class="meta-col">
+            <div class="meta-label">Format</div>
+            <div class="meta-value">SCR</div>
+        </div>
+        <div class="meta-col">
+            <div class="meta-label">Case Score</div>
+            <div class="meta-value">{case_total} / {case_max}</div>
+        </div>
+        <div class="meta-col">
+            <div class="meta-label">Case Result</div>
+            <div class="meta-value {result_class}">{case_result}</div>
+        </div>
+    </div>
+
+    {timing_banner}
+
+    <h2>Domain Results</h2>
+    <table class="domain-table">
+        <tr><th style="width:70%;">Domain</th><th style="width:30%;">Result</th></tr>
+        {domain_rows}
+    </table>
+
+    <h2>Case Summary</h2>
+    <table class="case-table">
+        <tr>
+            <th style="width:12%;">Case</th>
+            <th style="width:63%;">GDC Safe Practitioner Framework Learning Outcomes Assessed</th>
+            <th style="width:25%;">Result</th>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td>{codes_str}</td>
+            <td class="{result_class}">{case_result}</td>
+        </tr>
+        <tr class="case-total-row">
+            <td colspan="2">Case Total</td>
+            <td>{case_total} / {case_max}</td>
+        </tr>
+    </table>
+
+    <h2>Domain Feedback</h2>
+    {feedback_cards}
+
+    <h2>Areas for Improvement</h2>
+    <div class="feedback-box"><ul>{improvements_list}</ul></div>
+
+    <h2>Confidence &amp; Delivery</h2>
+    <div class="confidence-box">
+        <div style="font-weight: bold; color: #334155; margin-bottom: 10px;">Confidence Score: <span style="color: #0284c7;">{confidence.get('score', 0)}/100</span></div>
+        <p style="margin: 0; color: #475569; font-size: 9.5pt;">{confidence.get('feedback', '')}</p>
+    </div>
+
+    <h2>GDC Code Glossary</h2>
+    <table class="glossary-table">
+        <tr><th style="width:15%;">Code</th><th style="width:85%;">Meaning</th></tr>
+        {glossary_rows}
+    </table>
+
+</div>
+</body>
+</html>
+"""
+
+
 def write_s3_html(bucket, key, html_content):
-    """Writes the HTML report to S3 with the correct content type."""
     s3.put_object(
         Bucket=bucket,
         Key=key,
@@ -655,7 +810,6 @@ def write_s3_html(bucket, key, html_content):
 
 
 def send_report_email(case_id, file_prefix, html_content, recipient):
-    """Sends the HTML assessment report as an email attachment via AWS SES."""
     import email.mime.multipart
     import email.mime.text
     import email.mime.base
@@ -667,7 +821,7 @@ def send_report_email(case_id, file_prefix, html_content, recipient):
     msg["To"]      = recipient
 
     body = email.mime.text.MIMEText(
-        f"Please find attached the ORE assessment report for {file_prefix}.",
+        f"Please find attached the assessment report for {file_prefix}.",
         "plain"
     )
     msg.attach(body)
@@ -695,24 +849,6 @@ def lambda_handler(event, context):
 
     print("EVENT =", json.dumps(event))
 
-    #
-    # Two ways this Lambda gets invoked:
-    #
-    # 1. Manual / Step Functions:
-    # {
-    #   "caseId":           "case1-amalgam-highspot",
-    #   "student_json_key": "transcripts/case1-amalgam-highspot/student1.json",
-    #   "emailId":          "academy@planore.co.uk",
-    #   "reportType":       "detailed"   <- optional, "detailed" | "basic", defaults to "detailed"
-    # }
-    #
-    # 2. Automated — triggered when a transcript JSON lands in S3
-    #    (raw S3 Event Notification or EventBridge "Object Created"
-    #    event). caseId + student_json_key are derived from the S3 key;
-    #    emailId falls back to the DEFAULT_NOTIFY_EMAIL env var;
-    #    reportType falls back to the DEFAULT_REPORT_TYPE env var.
-    #
-
     case_id, student_json_key, email_id, report_type = resolve_input(event)
 
     if not student_json_key:
@@ -734,76 +870,98 @@ def lambda_handler(event, context):
 
     try:
 
+        # Assessment type — NEW. Defaults to OSCE if the file is absent,
+        # so all 10 existing cases need no changes.
+        assessment_type_key = f"cases/{case_id}/assessment-type.txt"
+        assessment_type = (try_read_s3_text(BUCKET_NAME, assessment_type_key) or "OSCE").strip().upper()
+        print(f"Assessment type: {assessment_type}")
+
         #
         # S3 keys — all case-specific files live under cases/{caseId}/
         #
-
-        case_image_key    = f"cases/{case_id}/case-study.jpeg"
-        case_study_key    = f"cases/{case_id}/case-study.txt"
-        marking_key       = f"cases/{case_id}/case-evaluation-matrix-extracted.txt"
-        reference_key     = f"cases/{case_id}/reference-knowledge.json"
-        prompt_key        = f"cases/{case_id}/prompt-template.txt"
+        case_study_key = f"cases/{case_id}/case-study.txt"
+        marking_key    = f"cases/{case_id}/case-evaluation-matrix-extracted.txt"
+        reference_key  = f"cases/{case_id}/reference-knowledge.json"
+        prompt_key     = f"cases/{case_id}/prompt-template.txt"
 
         print(f"Loading case resources for {case_id}")
 
-        #
-        # Read all S3 inputs
-        #
-        # Case study can be provided either as an image (case-study.jpeg)
-        # or as plain text (case-study.txt). If the image exists, it is
-        # sent to Claude as visual context and no text case study is
-        # needed. If the image is missing, we fall back to the text file.
-        #
+        # Case study — text and images are now loaded independently and
+        # unconditionally (not either/or). load_case_images() falls
+        # back to the legacy single case-study.jpeg internally, so this
+        # is fully backward compatible with every existing OSCE case.
+        case_study_text = try_read_s3_text(BUCKET_NAME, case_study_key) or ""
+        case_images = load_case_images(BUCKET_NAME, case_id)
 
-        case_image_base64 = try_read_s3_image_base64(BUCKET_NAME, case_image_key)
-
-        case_study_text = ""
-        if not case_image_base64:
-            case_study_text = try_read_s3_text(BUCKET_NAME, case_study_key) or ""
-            if case_study_text:
-                print(f"Using text case study from {case_study_key}")
-            else:
-                print(f"No case-study.jpeg or case-study.txt found for {case_id} — proceeding without case study context")
+        if case_study_text:
+            print(f"Loaded case study text from {case_study_key}")
+        if case_images:
+            print(f"Loaded {len(case_images)} case image(s)")
+        if not case_study_text and not case_images:
+            print(f"No case-study.txt, case-study.jpeg, or case-study-images/ found for {case_id} — proceeding without case study context")
 
         print(f"Reading marking matrix: {marking_key}")
-        marking_matrix    = read_s3_text(BUCKET_NAME, marking_key)
+        marking_matrix = read_s3_text(BUCKET_NAME, marking_key)
         print("✓ marking matrix loaded")
 
         print(f"Reading reference knowledge: {reference_key}")
-        reference_json    = read_s3_text(BUCKET_NAME, reference_key)
+        reference_json = read_s3_text(BUCKET_NAME, reference_key)
         print("✓ reference knowledge loaded")
 
         print(f"Reading student transcript: {student_json_key}")
-        student_json      = read_s3_text(BUCKET_NAME, student_json_key)
+        student_json = read_s3_text(BUCKET_NAME, student_json_key)
         print("✓ student transcript loaded")
 
         print(f"Reading prompt template: {prompt_key}")
-        prompt_template   = read_s3_text(BUCKET_NAME, prompt_key)
+        prompt_template = read_s3_text(BUCKET_NAME, prompt_key)
         print("✓ prompt template loaded")
 
-        #
-        # Extract transcripts
-        #
-
         reference_answer = extract_transcript(reference_json)
-        student_answer   = extract_transcript(student_json)
+        student_answer, duration_seconds = extract_transcript_and_duration(student_json)
+        print(f"Student recording duration: {duration_seconds:.0f}s")
+
+        # HARD reject only beyond MAX_SCR_RECORDING_SECONDS, SCR only
+        if assessment_type == "SCR" and duration_seconds > MAX_SCR_RECORDING_SECONDS:
+            print(f"REJECTED — duration {duration_seconds:.0f}s exceeds SCR hard limit of {MAX_SCR_RECORDING_SECONDS}s")
+
+            report_key = f"reports/{case_id}/{file_prefix}-report.html"
+            html_report = generate_time_limit_rejection_report(case_id, duration_seconds, MAX_SCR_RECORDING_SECONDS)
+
+            write_s3_html(BUCKET_NAME, report_key, html_report)
+            send_report_email(case_id, file_prefix, html_report, email_id)
+
+            return {
+                "statusCode": 200,
+                "body": {
+                    "message": "Rejected — recording exceeds SCR time limit",
+                    "caseId": case_id,
+                    "student": file_prefix,
+                    "report_s3_key": report_key,
+                    "email_sent_to": email_id,
+                    "durationSeconds": duration_seconds
+                }
+            }
+
+        # 10-12 min: scored normally, but flagged — not a rejection
+        timing_advisory = None
+        if assessment_type == "SCR" and duration_seconds > SCR_IDEAL_MAX_SECONDS:
+            timing_advisory = (
+                f"This recording was {duration_seconds / 60:.1f} minutes long. "
+                f"The SCR exam format expects each case to be answered in "
+                f"approximately 10 minutes — aim to bring your response "
+                f"closer to this target."
+            )
+            print(f"NOTE: duration {duration_seconds:.0f}s exceeds ideal {SCR_IDEAL_MAX_SECONDS}s — flagging in report, not rejecting")
 
         #
-        # Relevance gate — reject outright if this transcript clearly
-        # doesn't match this case's scenario (e.g. wrong recording
-        # uploaded to the wrong case), BEFORE running the real scoring
-        # prompt. This is a separate, narrow check so it isn't subject
-        # to the scoring prompt's built-in leniency/partial-credit
-        # instructions, which is what let a mismatched case1/case3
-        # upload through as "Meets Standard" previously.
+        # Relevance gate
         #
-
         print("Running case-relevance check...")
         relevance = check_case_relevance(
             case_study_text,
             marking_matrix,
             student_answer,
-            image_base64=case_image_base64
+            images_base64=case_images
         )
         print(f"Relevance check result: {relevance}")
 
@@ -828,22 +986,10 @@ def lambda_handler(event, context):
                 }
             }
 
-        #
-        # Knowledge Base retrieval (optional — only if KNOWLEDGE_BASE_ID
-        # is configured). Retrieves supplementary reference material
-        # relevant to what the student actually said, to augment
-        # (not replace) the case's own marking matrix and reference
-        # answer already loaded above.
-        #
-
         knowledge_context = retrieve_knowledge_base_context(
             query_text=student_answer,
             case_id=case_id
         )
-
-        #
-        # Build prompt from S3 template
-        #
 
         prompt = build_prompt(
             prompt_template,
@@ -854,34 +1000,24 @@ def lambda_handler(event, context):
             knowledge_context=knowledge_context
         )
 
-        #
-        # Claude evaluation
-        #
+        result_text = invoke_claude(prompt, images_base64=case_images)
 
-        result_text = invoke_claude(
-            prompt,
-            image_base64=case_image_base64
-        )
-
-        assessment = json.loads(
-            clean_json_response(result_text)
-        )
-
-        #
-        # Generate and upload HTML report
-        #
+        assessment = json.loads(clean_json_response(result_text))
 
         report_key = f"reports/{case_id}/{file_prefix}-report.html"
 
-        html_report = generate_html_report(assessment, report_key, report_type=report_type)
+        if assessment_type == "SCR":
+            html_report = generate_html_report_scr(
+                assessment,
+                report_key,
+                case_id,
+                timing_advisory=timing_advisory
+            )
+        else:
+            html_report = generate_html_report(assessment, report_key, report_type=report_type)
 
         print(f"Uploading report to {report_key}")
-
         write_s3_html(BUCKET_NAME, report_key, html_report)
-
-        #
-        # Send email
-        #
 
         send_report_email(case_id, file_prefix, html_report, email_id)
 
@@ -893,7 +1029,9 @@ def lambda_handler(event, context):
                 "student":       file_prefix,
                 "report_s3_key": report_key,
                 "email_sent_to": email_id,
-                "reportType":    report_type
+                "reportType":    report_type,
+                "assessmentType": assessment_type,
+                "durationSeconds": duration_seconds
             }
         }
 
