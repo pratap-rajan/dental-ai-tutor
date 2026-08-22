@@ -132,8 +132,8 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
-    id: "scr-case1-periapical-cyst",
-    label: "Case 1 — Periapical cyst",
+    id: "case1-scr-dental-trauma",
+    label: "Case 1 — Dental trauma",
     stationType: "SCR"
   }
 ];
