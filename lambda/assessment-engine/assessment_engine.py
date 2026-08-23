@@ -1,8 +1,19 @@
 import json
 import os
 import base64
+import io
+import datetime
 import urllib.parse
 import boto3
+from boto3.dynamodb.conditions import Key as DynamoKey
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_LEFT
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, ListFlowable, ListItem
+)
 
 s3 = boto3.client("s3")
 
@@ -809,7 +820,14 @@ def write_s3_html(bucket, key, html_content):
     )
 
 
-def send_report_email(case_id, file_prefix, html_content, recipient):
+def send_report_email_pdf(case_id, file_prefix, pdf_bytes, recipient):
+    """
+    Replaces the old HTML-attachment version — attaches the generated
+    PDF instead, since PDF opens reliably in every email client
+    (including mobile) without depending on HTML rendering support.
+    The HTML report is still written to S3 separately, for the React
+    portal's view/print flow.
+    """
     import email.mime.multipart
     import email.mime.text
     import email.mime.base
@@ -826,13 +844,13 @@ def send_report_email(case_id, file_prefix, html_content, recipient):
     )
     msg.attach(body)
 
-    attachment = email.mime.base.MIMEBase("text", "html")
-    attachment.set_payload(html_content.encode("utf-8"))
+    attachment = email.mime.base.MIMEBase("application", "pdf")
+    attachment.set_payload(pdf_bytes)
     email.encoders.encode_base64(attachment)
     attachment.add_header(
         "Content-Disposition",
         "attachment",
-        filename=f"{file_prefix}-report.html"
+        filename=f"{file_prefix}-report.pdf"
     )
     msg.attach(attachment)
 
@@ -842,7 +860,36 @@ def send_report_email(case_id, file_prefix, html_content, recipient):
         RawMessage={"Data": msg.as_string()}
     )
 
-    print(f"Report email sent to {recipient} for {file_prefix}")
+    print(f"Report PDF emailed to {recipient} for {file_prefix}")
+
+
+def write_s3_pdf(bucket, key, pdf_bytes):
+    s3.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=pdf_bytes,
+        ContentType="application/pdf"
+    )
+
+
+def send_rejection_email(case_id, file_prefix, reason_text, recipient):
+    """
+    Rejections (case mismatch, time limit) are short notices, not
+    scored reports — sent as plain text, no PDF/HTML attachment.
+    """
+    ses.send_email(
+        Source=REPORT_SENDER,
+        Destination={"ToAddresses": [recipient]},
+        Message={
+            "Subject": {"Data": f"{case_id} — Unable to Assess"},
+            "Body": {"Text": {"Data": (
+                f"Your recording for {file_prefix} could not be assessed.\n\n"
+                f"{reason_text}\n\n"
+                f"No score has been generated for this attempt."
+            )}}
+        }
+    )
+    print(f"Rejection email sent to {recipient} for {file_prefix}")
 
 
 def lambda_handler(event, context):
@@ -926,9 +973,13 @@ def lambda_handler(event, context):
 
             report_key = f"reports/{case_id}/{file_prefix}-report.html"
             html_report = generate_time_limit_rejection_report(case_id, duration_seconds, MAX_SCR_RECORDING_SECONDS)
-
             write_s3_html(BUCKET_NAME, report_key, html_report)
-            send_report_email(case_id, file_prefix, html_report, email_id)
+
+            reason_text = (
+                f"Your recording was {duration_seconds / 60:.1f} minutes long, which exceeds "
+                f"the {MAX_SCR_RECORDING_SECONDS / 60:.0f}-minute limit for this case type."
+            )
+            send_rejection_email(case_id, file_prefix, reason_text, email_id)
 
             return {
                 "statusCode": 200,
@@ -970,9 +1021,9 @@ def lambda_handler(event, context):
 
             report_key = f"reports/{case_id}/{file_prefix}-report.html"
             html_report = generate_rejection_report(case_id, relevance["reason"])
-
             write_s3_html(BUCKET_NAME, report_key, html_report)
-            send_report_email(case_id, file_prefix, html_report, email_id)
+
+            send_rejection_email(case_id, file_prefix, relevance["reason"], email_id)
 
             return {
                 "statusCode": 200,
@@ -1005,21 +1056,29 @@ def lambda_handler(event, context):
         assessment = json.loads(clean_json_response(result_text))
 
         report_key = f"reports/{case_id}/{file_prefix}-report.html"
+        pdf_key    = f"reports/{case_id}/{file_prefix}-report.pdf"
 
         if assessment_type == "SCR":
             html_report = generate_html_report_scr(
-                assessment,
-                report_key,
-                case_id,
-                timing_advisory=timing_advisory
+                assessment, report_key, case_id, timing_advisory=timing_advisory
             )
+            pdf_bytes = generate_pdf_bytes_scr(assessment, case_id, timing_advisory=timing_advisory)
         else:
             html_report = generate_html_report(assessment, report_key, report_type=report_type)
+            pdf_bytes = generate_pdf_bytes(assessment, report_type=report_type)
 
-        print(f"Uploading report to {report_key}")
+        print(f"Uploading HTML report to {report_key}")
         write_s3_html(BUCKET_NAME, report_key, html_report)
 
-        send_report_email(case_id, file_prefix, html_report, email_id)
+        print(f"Uploading PDF report to {pdf_key}")
+        write_s3_pdf(BUCKET_NAME, pdf_key, pdf_bytes)
+
+        send_report_email_pdf(case_id, file_prefix, pdf_bytes, email_id)
+
+        # Index for "My Reports" + apply the 3-months-or-50 retention rule.
+        # Only real scored attempts count toward a student's history —
+        # rejections above never reach this line.
+        record_report_and_prune(email_id, case_id, file_prefix, report_key, pdf_key, assessment_type)
 
         return {
             "statusCode": 200,
@@ -1028,6 +1087,7 @@ def lambda_handler(event, context):
                 "caseId":        case_id,
                 "student":       file_prefix,
                 "report_s3_key": report_key,
+                "report_pdf_key": pdf_key,
                 "email_sent_to": email_id,
                 "reportType":    report_type,
                 "assessmentType": assessment_type,
@@ -1045,3 +1105,264 @@ def lambda_handler(event, context):
                 "error": str(ex)
             }
         }
+
+
+# ============================================================
+# PDF GENERATION (ReportLab) — for email attachments only.
+# The HTML reports above remain the source of truth for the
+# React portal's "view and print" flow (their @page CSS is
+# already print-optimized, so the browser's own Print > Save as
+# PDF handles that case without needing a second PDF here).
+# ============================================================
+
+_styles = getSampleStyleSheet()
+_STYLE_TITLE = ParagraphStyle("ReportTitle", parent=_styles["Title"], fontSize=18, textColor=colors.HexColor("#0f172a"), spaceAfter=2)
+_STYLE_SUBTITLE = ParagraphStyle("ReportSubtitle", parent=_styles["Normal"], fontSize=10, textColor=colors.HexColor("#0284c7"))
+_STYLE_H2 = ParagraphStyle("H2", parent=_styles["Heading2"], fontSize=13, textColor=colors.HexColor("#0f172a"), spaceBefore=14, spaceAfter=6)
+_STYLE_BODY = ParagraphStyle("Body", parent=_styles["Normal"], fontSize=9.5, leading=13, textColor=colors.HexColor("#334155"), alignment=TA_LEFT)
+_STYLE_SCORE = ParagraphStyle("Score", parent=_styles["Normal"], fontSize=9.5, leading=13, textColor=colors.HexColor("#0f172a"), fontName="Helvetica-Bold")
+_STYLE_ADVISORY = ParagraphStyle("Advisory", parent=_styles["Normal"], fontSize=9.5, leading=13, textColor=colors.HexColor("#78350f"), backColor=colors.HexColor("#fffbeb"))
+
+_TABLE_HEADER_STYLE = [
+    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#475569")),
+    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+    ("FONTSIZE", (0, 0), (-1, -1), 9),
+    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+    ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+]
+
+
+def _pdf_doc(buffer):
+    return SimpleDocTemplate(
+        buffer, pagesize=A4,
+        topMargin=18 * mm, bottomMargin=18 * mm,
+        leftMargin=16 * mm, rightMargin=16 * mm
+    )
+
+
+def generate_pdf_bytes(assessment, report_type="detailed"):
+    """OSCE PDF — mirrors generate_html_report()'s content, for email only."""
+    buffer = io.BytesIO()
+    doc = _pdf_doc(buffer)
+    story = []
+
+    story.append(Paragraph("Candidate Outcome Report", _STYLE_TITLE))
+    story.append(Paragraph("UK ORE-Style Examination Assessment", _STYLE_SUBTITLE))
+    story.append(Spacer(1, 10))
+
+    story.append(Paragraph(
+        f"Overall Score: {assessment.get('overall_score', 0)}%  &nbsp;&nbsp;|&nbsp;&nbsp;  "
+        f"Grade: {assessment.get('overall_grade', 'N/A')}",
+        _STYLE_SCORE
+    ))
+    story.append(Spacer(1, 10))
+
+    if report_type == "detailed" and assessment.get("criteria"):
+        story.append(Paragraph("Criteria Breakdown", _STYLE_H2))
+        rows = [["Domain", "Score", "Feedback"]]
+        for c in assessment["criteria"]:
+            rows.append([
+                Paragraph(c.get("name", "N/A"), _STYLE_BODY),
+                f"{c.get('score', 0)}/{c.get('max_score', 0)}",
+                Paragraph(c.get("feedback", ""), _STYLE_BODY)
+            ])
+        t = Table(rows, colWidths=[110, 45, 300])
+        t.setStyle(TableStyle(_TABLE_HEADER_STYLE))
+        story.append(t)
+
+    if report_type == "detailed" and assessment.get("confidence_assessment"):
+        conf = assessment["confidence_assessment"]
+        story.append(Paragraph("Confidence &amp; Delivery Assessment", _STYLE_H2))
+        story.append(Paragraph(f"Score: {conf.get('score', 0)}/100", _STYLE_SCORE))
+        story.append(Paragraph(conf.get("feedback", ""), _STYLE_BODY))
+
+    if assessment.get("strengths"):
+        story.append(Paragraph("Key Strengths", _STYLE_H2))
+        story.append(ListFlowable(
+            [ListItem(Paragraph(s, _STYLE_BODY)) for s in assessment["strengths"]],
+            bulletType="bullet"
+        ))
+
+    if assessment.get("areas_for_improvement"):
+        story.append(Paragraph("Areas for Improvement", _STYLE_H2))
+        story.append(ListFlowable(
+            [ListItem(Paragraph(i, _STYLE_BODY)) for i in assessment["areas_for_improvement"]],
+            bulletType="bullet"
+        ))
+
+    if assessment.get("final_feedback"):
+        story.append(Paragraph("Final Summary &amp; Examiner Feedback", _STYLE_H2))
+        story.append(Paragraph(assessment["final_feedback"], _STYLE_BODY))
+
+    doc.build(story)
+    return buffer.getvalue()
+
+
+def generate_pdf_bytes_scr(assessment, case_id, timing_advisory=None):
+    """SCR PDF — mirrors generate_html_report_scr()'s content, for email only."""
+    buffer = io.BytesIO()
+    doc = _pdf_doc(buffer)
+    story = []
+
+    domains = assessment.get("domains", [])
+    case_total = assessment.get("case_total", 0)
+    case_max = assessment.get("case_max", 16)
+    case_result = assessment.get("case_result", "Did Not Meet Standard")
+
+    story.append(Paragraph("Structured Clinical Reasoning Report", _STYLE_TITLE))
+    story.append(Paragraph("Plan Ore Academy &middot; ORE Buddy", _STYLE_SUBTITLE))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(
+        f"Case: {case_id} &nbsp;&nbsp;|&nbsp;&nbsp; Score: {case_total}/{case_max} "
+        f"&nbsp;&nbsp;|&nbsp;&nbsp; Result: {case_result}",
+        _STYLE_SCORE
+    ))
+    story.append(Spacer(1, 8))
+
+    if timing_advisory:
+        story.append(Paragraph(f"<b>Timing note:</b> {timing_advisory} This is advisory only and did not affect your score.", _STYLE_ADVISORY))
+        story.append(Spacer(1, 8))
+
+    story.append(Paragraph("Domain Results", _STYLE_H2))
+    rows = [["Domain", "Result"]]
+    for d in domains:
+        result = "Met Standard" if d.get("score", 0) >= 3 else "Did Not Meet Standard"
+        rows.append([Paragraph(d.get("name", "N/A"), _STYLE_BODY), result])
+    t = Table(rows, colWidths=[340, 115])
+    t.setStyle(TableStyle(_TABLE_HEADER_STYLE))
+    story.append(t)
+
+    story.append(Paragraph("Domain Feedback", _STYLE_H2))
+    for i, d in enumerate(domains, start=1):
+        score = d.get("score", 0)
+        result = "Met Standard" if score >= 3 else "Did Not Meet Standard"
+        story.append(Paragraph(f"{i}. {d.get('name', 'N/A')} — Score: {score}/4 ({result})", _STYLE_SCORE))
+        story.append(Paragraph(d.get("feedback", ""), _STYLE_BODY))
+        story.append(Spacer(1, 6))
+
+    if assessment.get("areas_for_improvement"):
+        story.append(Paragraph("Areas for Improvement", _STYLE_H2))
+        story.append(ListFlowable(
+            [ListItem(Paragraph(i, _STYLE_BODY)) for i in assessment["areas_for_improvement"]],
+            bulletType="bullet"
+        ))
+
+    confidence = assessment.get("confidence_assessment", {})
+    if confidence:
+        story.append(Paragraph("Confidence &amp; Delivery", _STYLE_H2))
+        story.append(Paragraph(f"Score: {confidence.get('score', 0)}/100", _STYLE_SCORE))
+        story.append(Paragraph(confidence.get("feedback", ""), _STYLE_BODY))
+
+    if assessment.get("code_glossary"):
+        story.append(Paragraph("GDC Code Glossary", _STYLE_H2))
+        rows = [["Code", "Meaning"]]
+        for entry in assessment["code_glossary"]:
+            rows.append([entry.get("code", ""), Paragraph(entry.get("meaning", ""), _STYLE_BODY)])
+        t = Table(rows, colWidths=[70, 385])
+        t.setStyle(TableStyle(_TABLE_HEADER_STYLE))
+        story.append(t)
+
+    doc.build(story)
+    return buffer.getvalue()
+
+
+# ============================================================
+# REPORT INDEX + RETENTION (DynamoDB)
+# Table: student-reports  (PK: emailId [String], SK: reportTimestamp [String, ISO8601])
+# Needed because reports/{case_id}/{student}.* is keyed by CASE, not
+# by student — there is no existing way to list "this student's last
+# 50 reports across every case they've done" without an index.
+# Retention: keep a report only if it is BOTH within the last 3
+# months AND among the 50 most recent for that email — i.e. delete
+# whichever rule is violated first ("whichever is lower").
+# ============================================================
+
+dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("REGION", "eu-west-2"))
+REPORTS_TABLE_NAME = os.environ.get("REPORTS_TABLE_NAME", "student-reports")
+reports_table = dynamodb.Table(REPORTS_TABLE_NAME)
+
+MAX_REPORTS_PER_STUDENT = int(os.environ.get("MAX_REPORTS_PER_STUDENT", "50"))
+REPORT_RETENTION_DAYS = int(os.environ.get("REPORT_RETENTION_DAYS", "90"))  # ~3 months
+
+
+def record_report_and_prune(email_id, case_id, file_prefix, html_key, pdf_key, assessment_type):
+    """
+    Called once per successfully SCORED report (not for rejections —
+    a mismatched-case or over-time rejection isn't a real attempt
+    worth taking up the student's retention slots). Writes an index
+    entry, then prunes anything beyond the retention rule for this
+    student.
+    """
+    now = datetime.datetime.utcnow()
+    timestamp = now.isoformat() + "Z"
+
+    try:
+        reports_table.put_item(Item={
+            "emailId": email_id.lower().strip(),
+            "reportTimestamp": timestamp,
+            "caseId": case_id,
+            "studentFilePrefix": file_prefix,
+            "htmlKey": html_key,
+            "pdfKey": pdf_key,
+            "assessmentType": assessment_type
+        })
+        print(f"Indexed report for {email_id} at {timestamp}")
+    except Exception as ex:
+        # Non-fatal — the student's report/email still succeeded even
+        # if indexing fails. Worst case, it just won't appear in "My
+        # Reports" or count toward retention pruning.
+        print(f"WARNING: could not index report for {email_id}: {ex}")
+        return
+
+    prune_old_reports(email_id)
+
+
+def prune_old_reports(email_id):
+    """
+    Deletes any report for this student that is either:
+      - not among the MAX_REPORTS_PER_STUDENT most recent, OR
+      - older than REPORT_RETENTION_DAYS
+    Deletes the S3 objects (HTML + PDF) and the DynamoDB index entry
+    together, so the index and S3 never drift apart.
+    """
+    try:
+        resp = reports_table.query(
+            KeyConditionExpression=DynamoKey("emailId").eq(email_id.lower().strip()),
+            ScanIndexForward=False  # newest first
+        )
+        items = resp.get("Items", [])
+    except Exception as ex:
+        print(f"WARNING: could not query reports for {email_id}, skipping prune: {ex}")
+        return
+
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=REPORT_RETENTION_DAYS)
+
+    to_delete = []
+    for rank, item in enumerate(items):
+        item_time = datetime.datetime.fromisoformat(item["reportTimestamp"].rstrip("Z"))
+        if rank >= MAX_REPORTS_PER_STUDENT or item_time < cutoff:
+            to_delete.append(item)
+
+    for item in to_delete:
+        for key in (item.get("htmlKey"), item.get("pdfKey")):
+            if not key:
+                continue
+            try:
+                s3.delete_object(Bucket=BUCKET_NAME, Key=key)
+            except Exception as ex:
+                print(f"WARNING: could not delete {key} during prune: {ex}")
+        try:
+            reports_table.delete_item(Key={
+                "emailId": item["emailId"],
+                "reportTimestamp": item["reportTimestamp"]
+            })
+        except Exception as ex:
+            print(f"WARNING: could not remove index entry for {item.get('reportTimestamp')}: {ex}")
+
+    if to_delete:
+        print(f"Pruned {len(to_delete)} old report(s) for {email_id}")
