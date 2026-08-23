@@ -43,20 +43,22 @@ def presign(key):
 
 def lambda_handler(event, context):
     """
-    Requires a Cognito User Pool authorizer attached to this route in
-    API Gateway — that's what populates
-    event.requestContext.authorizer.claims.email below. This Lambda
-    never trusts an email passed in the request itself; a student can
-    only ever list their OWN reports, derived from their verified
-    ID token.
+    Requires a JWT authorizer attached to this route in API Gateway
+    (HTTP API), pointed at your Cognito User Pool — that's what
+    populates event.requestContext.authorizer.jwt.claims below. Note
+    this is the HTTP API (payload format 2.0) shape, one level deeper
+    than the classic REST API Cognito-authorizer shape
+    (event.requestContext.authorizer.claims). This Lambda never trusts
+    an email passed in the request itself; a student can only ever
+    list their OWN reports, derived from their verified ID token.
     """
     print("EVENT =", json.dumps(event))
 
-    if event.get("httpMethod") == "OPTIONS":
+    if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS":
         return response(200, {})
 
     try:
-        claims = event["requestContext"]["authorizer"]["claims"]
+        claims = event["requestContext"]["authorizer"]["jwt"]["claims"]
         email = claims["email"]
     except (KeyError, TypeError):
         return response(401, {"error": "Missing or invalid authorization"})
