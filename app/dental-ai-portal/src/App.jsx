@@ -6,6 +6,7 @@ import UploadForm from "./UploadForm.jsx";
 import Confirmation from "./Confirmation.jsx";
 import Footer from "./Footer.jsx";
 import Login from "./Login.jsx";
+import MyReports from "./MyReports.jsx";
 import { useAuth } from "./AuthContext.jsx";
 
 const STORAGE_KEY = "planore_pending_submission";
@@ -13,6 +14,7 @@ const COOLDOWN_MS = 200000; // matches Confirmation.jsx's "settle" timer
 
 export default function App() {
   const [submission, setSubmission] = useState(null);
+  const [showReports, setShowReports] = useState(false);
   const formRef = useRef(null);
 
   // Restore an in-progress submission after a page refresh, so a
@@ -50,7 +52,7 @@ export default function App() {
     setSubmission(null);
   }
 
-  const { status, name, email, error, signOut } = useAuth();
+  const { status, name, email, error, signOut, session } = useAuth();
 
   // Still checking for a stored/callback session on first load.
   if (status === "loading") {
@@ -73,9 +75,29 @@ export default function App() {
     return <Login authError={status === "error"} errorDetail={error} />;
   }
 
+  if (showReports) {
+    return (
+      <div style={{ background: "#04070f", minHeight: "100vh" }}>
+        <Header
+          onCtaClick={scrollToForm}
+          studentName={name}
+          onSignOut={signOut}
+          onShowReports={() => setShowReports(true)}
+        />
+        <MyReports idToken={session?.idToken} onBack={() => setShowReports(false)} />
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div style={{ background: "#04070f" }}>
-      <Header onCtaClick={scrollToForm} studentName={name} onSignOut={signOut} />
+      <Header
+        onCtaClick={scrollToForm}
+        studentName={name}
+        onSignOut={signOut}
+        onShowReports={() => setShowReports(true)}
+      />
       <Hero onCtaClick={scrollToForm} />
       <HowItWorks />
       {submission ? (

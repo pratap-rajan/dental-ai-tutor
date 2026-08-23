@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { theme, fonts } from "./theme.js";
 
-export default function Header({ onCtaClick, studentName, onSignOut }) {
+export default function Header({ onCtaClick, studentName, onSignOut, onShowReports }) {
   const [signOutHovered, setSignOutHovered] = useState(false);
 
   return (
@@ -16,6 +16,9 @@ export default function Header({ onCtaClick, studentName, onSignOut }) {
           {studentName && (
             <div style={styles.identity}>
               <span style={styles.studentName}>{studentName}</span>
+              <button style={styles.reportsButton} onClick={onShowReports}>
+                My Reports
+              </button>
               <button
                 style={{
                   ...styles.signOutButton,
@@ -106,6 +109,18 @@ const styles = {
     fontFamily: fonts.body,
     whiteSpace: "nowrap",
     transition: "background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease"
+  },
+  reportsButton: {
+    border: `1.5px solid ${theme.navyLighter}`,
+    background: "transparent",
+    color: theme.mint,
+    fontSize: 12,
+    fontWeight: 500,
+    padding: "5px 12px",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontFamily: fonts.body,
+    whiteSpace: "nowrap"
   },
   cta: {
     background: theme.ctaMint,

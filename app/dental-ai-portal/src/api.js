@@ -71,3 +71,32 @@ export function uploadFileToS3(uploadUrl, file, onProgress) {
     xhr.send(file);
   });
 }
+
+/**
+ * Lists the signed-in student's own past reports (most recent first).
+ * The backend derives the student's identity from the Cognito ID
+ * token itself (via the API Gateway Cognito authorizer) — the email
+ * is never passed in the request, so a student can never see another
+ * student's reports by tampering with a request.
+ *
+ * Expected backend contract:
+ *   GET {API_BASE_URL}/my-reports
+ *   headers: { Authorization: idToken }
+ *   response: { reports: [{ caseId, assessmentType, timestamp, viewUrl, downloadUrl }] }
+ *
+ * viewUrl / downloadUrl are short-lived (10 min) presigned S3 GET
+ * URLs — re-fetch the list if they've expired rather than caching them.
+ */
+export async function fetchMyReports(idToken) {
+  const response = await fetch(`${API_BASE_URL}/my-reports`, {
+    method: "GET",
+    headers: { Authorization: idToken }
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Could not load reports (${response.status}). ${text}`.trim());
+  }
+
+  return response.json();
+}
