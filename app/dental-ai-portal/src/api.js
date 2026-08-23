@@ -90,7 +90,7 @@ export function uploadFileToS3(uploadUrl, file, onProgress) {
 export async function fetchMyReports(idToken) {
   const response = await fetch(`${API_BASE_URL}/my-reports`, {
     method: "GET",
-    headers: { Authorization: idToken }
+    headers: { Authorization: `Bearer ${idToken}` }
   });
 
   if (!response.ok) {
