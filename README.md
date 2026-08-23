@@ -63,7 +63,7 @@ by email as a PDF and viewable/printable anytime from the portal's
 | Per-student report history ("My Reports") with view/print + PDF download | ✅ Live |
 | Report retention — last 3 months or 50 reports, whichever is fewer | ✅ Live |
 | Email delivery via Amazon SES, domain-authenticated (SPF/DKIM/DMARC) | ✅ Live |
-| SES production access (beyond sandbox limits) | ❌ Requested, not yet approved |
+| SES production access (beyond sandbox limits) | ✅ Approved |
 | Server-side Cognito token verification on upload | ❌ Not yet built — see Known Gaps |
 | In-portal admin approval UI | ❌ Not yet built — console/CLI only |
 | DTP station type | ❌ Planned, not yet built |
@@ -879,9 +879,8 @@ since the signature is embedded in the URL.
   never a second, competing SPF record), DKIM (3 CNAME records), and
   DMARC — DNS is managed via Wix, despite the domain having been
   purchased through GoDaddy
-- **Production access:** requested, not yet approved — SES sandbox
-  limits still apply, meaning both sender and every recipient must be
-  individually verified until this clears
+- **Production access:** approved — no more sandbox limits; sender
+  and recipients no longer need individual verification
 
 ---
 
@@ -1167,25 +1166,27 @@ invocations for debugging.
 3. **Microsoft personal vs. organizational accounts** — see the
    Authentication section above; currently only personal Outlook
    accounts work correctly.
-4. **SES production access** — still pending approval; sandbox limits
-   apply until cleared.
-5. **Bounce/complaint SNS handling** — not yet built; recommended
-   before submitting for SES production access.
-6. **Single point of failure on the `Admins` group** — only one
+4. **Bounce/complaint SNS handling** — not yet built. This was flagged
+   as recommended before requesting SES production access; now that
+   access is approved and sandbox limits no longer apply, this is
+   worth prioritizing sooner rather than later, since a bad bounce/
+   complaint rate at production volume can affect sending reputation
+   in a way sandbox mode never exposed.
+5. **Single point of failure on the `Admins` group** — only one
    account is currently promoted; worth adding a backup admin.
-7. **Confidence-score rubric fix applied to SCR only.** The original
+6. **Confidence-score rubric fix applied to SCR only.** The original
    10 OSCE `prompt-template.txt` files still carry the old unanchored
    `confidence_assessment` instruction and haven't been retrofitted
    with the calibrated 0-100 rubric — same miscalibration risk exists
    there, just not yet observed.
-8. **`UploadForm.jsx` imports `./caseselect.jsx`** against the actual
+7. **`UploadForm.jsx` imports `./caseselect.jsx`** against the actual
    `CaseSelect.jsx` filename — works on macOS/Windows dev machines,
    untested against a Linux-based CI build (Amplify).
-9. **Report retention pruning is untested at real scale** — only
+8. **Report retention pruning is untested at real scale** — only
    exercised with a single indexed report so far; the 50-report and
    90-day boundary conditions haven't actually been hit in practice
    yet.
-10. **Knowledge Base has no SCR content yet** — all 91 pre-loaded
+9. **Knowledge Base has no SCR content yet** — all 91 pre-loaded
     topics are OSCE-only; SCR cases currently retrieve nothing (handled
     gracefully as empty context) until SCR-specific topics are ingested.
 
