@@ -57,7 +57,7 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
-    id: "case6-consent",
+    id: "case6-consent-extraction",
     label: "Case 6 — Consent for extraction of upper molar",
     stationType: "OSCE"
   },
