@@ -57,7 +57,7 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
-    id: "case6-consent-extraction",
+    id: "case6-consent",
     label: "Case 6 — Consent for extraction of upper molar",
     stationType: "OSCE"
   },
@@ -134,6 +134,11 @@ export const CASE_CATALOG = [
   {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
+    stationType: "SCR"
+  },
+  {
+    id: "case17-scr-median-rhomboidal-glossitis",
+    label: "Case 17 — Median rhomboid glossitis",
     stationType: "SCR"
   }
 ];
