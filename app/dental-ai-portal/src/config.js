@@ -140,6 +140,11 @@ export const CASE_CATALOG = [
     id: "case17-scr-median-rhomboidal-glossitis",
     label: "Case 17 — Median rhomboid glossitis",
     stationType: "SCR"
+  },
+  {
+    id: "case18-scr-discoloured-teeth",
+    label: "Case 18 — Discoloured teeth",
+    stationType: "SCR"
   }
 ];
 
