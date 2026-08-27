@@ -137,6 +137,16 @@ export const CASE_CATALOG = [
     stationType: "SCR"
   },
   {
+    id: "case2-scr-impacted-third-molar",
+    label: "Case 2 — Impacted third molar",
+    stationType: "SCR"
+  },
+  {
+    id: "case3-scr-periodontal-abscess",
+    label: "Case 3 — Periodontal abscess",
+    stationType: "SCR"
+  },
+  {
     id: "case17-scr-median-rhomboidal-glossitis",
     label: "Case 17 — Median rhomboid glossitis",
     stationType: "SCR"
