@@ -57,7 +57,7 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
-    id: "case6-consent",
+    id: "case6-consent-extraction",
     label: "Case 6 — Consent for extraction of upper molar",
     stationType: "OSCE"
   },
@@ -144,6 +144,21 @@ export const CASE_CATALOG = [
   {
     id: "case3-scr-periodontal-abscess",
     label: "Case 3 — Periodontal abscess",
+    stationType: "SCR"
+  },
+  {
+    id: "case4-scr-angular-cheilitis-reduced-vd-cracked-tooth",
+    label: "Case 4 — Angular cheilitis, decreased VD & cracked tooth",
+    stationType: "SCR"
+  },
+  {
+    id: "case5-scr-periodontitis",
+    label: "Case 5 — Periodontitis",
+    stationType: "SCR"
+  },
+  {
+    id: "case14-osmf-loose-denture",
+    label: "Case 14 — OSMF & loose denture",
     stationType: "SCR"
   },
   {
