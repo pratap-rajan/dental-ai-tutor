@@ -157,7 +157,7 @@ export const CASE_CATALOG = [
     stationType: "SCR"
   },
   {
-    id: "case14-osmf-loose-denture",
+    id: "case14-scr-osmf-loose-denture",
     label: "Case 14 — OSMF & loose denture",
     stationType: "SCR"
   },
