@@ -157,7 +157,22 @@ export const CASE_CATALOG = [
     stationType: "SCR"
   },
   {
-    id: "case14-scr-osmf-loose-denture",
+    id: "case6-scr-ameloblastoma",
+    label: "Case 6 — Ameloblastoma",
+    stationType: "SCR"
+  },
+  {
+    id: "case7-scr-denture-stomatitis",
+    label: "Case 7 — Denture stomatitis & increased VD",
+    stationType: "SCR"
+  },
+  {
+    id: "case8-scr-periapical-cyst",
+    label: "Case 8 — Periapical cyst & tooth wear",
+    stationType: "SCR"
+  },
+  {
+    id: "case14-osmf-loose-denture",
     label: "Case 14 — OSMF & loose denture",
     stationType: "SCR"
   },
