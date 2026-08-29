@@ -172,6 +172,21 @@ export const CASE_CATALOG = [
     stationType: "SCR"
   },
   {
+    id: "case9-scr-dry-socket-post-operative",
+    label: "Case 9 — Dry socket",
+    stationType: "SCR"
+  },
+  {
+    id: "case10-scr-white-lesion",
+    label: "Case 10 — White lesion (erosive lichen planus)",
+    stationType: "SCR"
+  },
+  {
+    id: "case11-scr-tmpds-attrition",
+    label: "Case 11 — TMPDS & attrition",
+    stationType: "SCR"
+  },
+  {
     id: "case14-osmf-loose-denture",
     label: "Case 14 — OSMF & loose denture",
     stationType: "SCR"
