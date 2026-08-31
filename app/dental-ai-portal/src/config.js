@@ -207,6 +207,11 @@ export const CASE_CATALOG = [
     stationType: "SCR"
   },
   {
+    id: "case16-scr-downs-syndrome",
+    label: "Case 16 — Down syndrome",
+    stationType: "SCR"
+  },
+  {
     id: "case17-scr-median-rhomboidal-glossitis",
     label: "Case 17 — Median rhomboid glossitis",
     stationType: "SCR"
@@ -214,6 +219,11 @@ export const CASE_CATALOG = [
   {
     id: "case18-scr-discoloured-teeth",
     label: "Case 18 — Discoloured teeth",
+    stationType: "SCR"
+  },
+  {
+    id: "case20-scr-suspicious-ulcer-benign-swelling",
+    label: "Case 20 — Suspicious ulcer & benign swelling",
     stationType: "SCR"
   }
 ];
