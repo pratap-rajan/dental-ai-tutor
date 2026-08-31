@@ -187,8 +187,23 @@ export const CASE_CATALOG = [
     stationType: "SCR"
   },
   {
+    id: "case12-scr-childhood-caries",
+    label: "Case 12 — Early childhood caries",
+    stationType: "SCR"
+  },
+  {
+    id: "case13-scr-ras-irreversible-pulpitis",
+    label: "Case 13 — RAS & irreversible pulpitis",
+    stationType: "SCR"
+  },
+  {
     id: "case14-osmf-loose-denture",
     label: "Case 14 — OSMF & loose denture",
+    stationType: "SCR"
+  },
+  {
+    id: "case15-scr-necrotising-gum-condition",
+    label: "Case 15 — Necrotising gum condition",
     stationType: "SCR"
   },
   {
