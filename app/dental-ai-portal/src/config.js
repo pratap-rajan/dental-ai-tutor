@@ -225,6 +225,21 @@ export const CASE_CATALOG = [
     id: "case20-scr-suspicious-ulcer-benign-swelling",
     label: "Case 20 — Suspicious ulcer & benign swelling",
     stationType: "SCR"
+  },
+  {
+    id: "case21-scr-perimplantmplantitis",
+    label: "Case 21 — Peri-implantitis",
+    stationType: "SCR"
+  },
+  {
+    id: "case22-scr-thumb-sucking",
+    label: "Case 22 — Thumb sucking",
+    stationType: "SCR"
+  },
+  {
+    id: "case23-scr-child-abuse",
+    label: "Case 23 — Suspected non-accidental injury",
+    stationType: "SCR"
   }
 ];
 
