@@ -240,6 +240,21 @@ export const CASE_CATALOG = [
     id: "case23-scr-child-abuse",
     label: "Case 23 — Suspected non-accidental injury",
     stationType: "SCR"
+  },
+  {
+    id: "case24-scr-complaint",
+    label: "Case 24 — Complaint",
+    stationType: "SCR"
+  },
+  {
+    id: "case25-scr-molar-incisor-hypomineralisation",
+    label: "Case 25 — Molar incisor hypomineralisation",
+    stationType: "SCR"
+  },
+  {
+    id: "case26-scr-dental-extraction-rivaroxaban",
+    label: "Case 26 — Extraction on rivaroxaban",
+    stationType: "SCR"
   }
 ];
 
