@@ -132,6 +132,11 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case21-fractured-anterior-tooth",
+    label: "Case 21 — Fractured anterior tooth",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
