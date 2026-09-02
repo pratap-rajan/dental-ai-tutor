@@ -137,6 +137,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case22-needlestick-injury",
+    label: "Case 22 — Needlestick injury",
+    stationType: "OSCE"
+  },
+  {
+    id: "case23-drunken-nurse",
+    label: "Case 23 — Nurse under the influence at work",
+    stationType: "OSCE"
+  },
+  {
+    id: "case24-nurse-doing-scale",
+    label: "Case 24 — Nurse performing scaling",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
