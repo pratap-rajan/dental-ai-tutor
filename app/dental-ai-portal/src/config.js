@@ -152,6 +152,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case25-nursing-bottle-caries",
+    label: "Case 25 — Nursing bottle caries",
+    stationType: "OSCE"
+  },
+  {
+    id: "case26-oralhygiene-instructions",
+    label: "Case 26 — Oral hygiene instructions",
+    stationType: "OSCE"
+  },
+  {
+    id: "case27-oral-submucous-fibrosis",
+    label: "Case 27 — Oral submucous fibrosis",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
