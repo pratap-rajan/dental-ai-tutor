@@ -167,6 +167,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case28-periapical-abscess",
+    label: "Case 28 — Periapical abscess",
+    stationType: "OSCE"
+  },
+  {
+    id: "case29-periodontitis",
+    label: "Case 29 — Periodontitis: breaking bad news",
+    stationType: "OSCE"
+  },
+  {
+    id: "case30-pit-and-fissure",
+    label: "Case 30 — Pit and fissure sealants",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
