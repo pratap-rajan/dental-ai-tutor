@@ -227,6 +227,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case40-white-patch",
+    label: "Case 40 — White patch (lichenoid reaction)",
+    stationType: "OSCE"
+  },
+  {
+    id: "case41-consent-third-molar",
+    label: "Case 41 — Consent for lower third molar extraction",
+    stationType: "OSCE"
+  },
+  {
+    id: "case42-child-anxiety-control",
+    label: "Case 42 — Child anxiety control",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
