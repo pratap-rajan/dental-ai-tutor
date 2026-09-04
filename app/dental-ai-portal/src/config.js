@@ -182,6 +182,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case31-pos-ops-instruction",
+    label: "Case 31 — Post-operative extraction instructions",
+    stationType: "OSCE"
+  },
+  {
+    id: "case32-recurrent-ulcers",
+    label: "Case 32 — Recurrent aphthous ulcers",
+    stationType: "OSCE"
+  },
+  {
+    id: "case33-repeat-radiograph",
+    label: "Case 33 — Repeat radiograph",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
