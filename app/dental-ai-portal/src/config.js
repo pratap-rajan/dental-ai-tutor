@@ -212,6 +212,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case37-extraction-warfarin",
+    label: "Case 37 — Extraction in a patient taking warfarin",
+    stationType: "OSCE"
+  },
+  {
+    id: "case38-broken-file",
+    label: "Case 38 — Broken endodontic file",
+    stationType: "OSCE"
+  },
+  {
+    id: "case39-discolouration",
+    label: "Case 39 — Tooth discolouration",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
