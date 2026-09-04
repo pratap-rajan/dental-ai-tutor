@@ -197,6 +197,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case34-smoking-cessation",
+    label: "Case 34 — Smoking cessation",
+    stationType: "OSCE"
+  },
+  {
+    id: "case35-smoking-implant",
+    label: "Case 35 — Smoking and implant treatment",
+    stationType: "OSCE"
+  },
+  {
+    id: "case36-tooth-wear",
+    label: "Case 36 — Tooth wear",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
