@@ -242,6 +242,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case43-lost-biopsy",
+    label: "Case 43 — Lost biopsy report",
+    stationType: "OSCE"
+  },
+  {
+    id: "case44-radiotheerapy-three-weeks",
+    label: "Case 44 — Pre-radiotherapy dental assessment",
+    stationType: "OSCE"
+  },
+  {
+    id: "case45-trigeminal-neuralgia",
+    label: "Case 45 — Trigeminal neuralgia",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
