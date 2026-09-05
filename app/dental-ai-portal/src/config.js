@@ -257,6 +257,31 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case46-child-abuse-neglect",
+    label: "Case 46 — Suspected child abuse and neglect",
+    stationType: "OSCE"
+  },
+  {
+    id: "case47-incapiciated-patient",
+    label: "Case 47 — Consent for an incapacitated adult",
+    stationType: "OSCE"
+  },
+  {
+    id: "case48-poking-wire",
+    label: "Case 48 — Poking orthodontic wire",
+    stationType: "OSCE"
+  },
+  {
+    id: "case49-xray-audit",
+    label: "Case 49 — X-ray quality audit",
+    stationType: "OSCE"
+  },
+  {
+    id: "case50-extraction-wrong-tooth",
+    label: "Case 50 — Extraction of wrong tooth",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
