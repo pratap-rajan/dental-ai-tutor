@@ -307,6 +307,31 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case56-bridge-retainer",
+    label: "Case 56 — Bridge retainer with periapical pathology",
+    stationType: "OSCE"
+  },
+  {
+    id: "case57-confidentiality",
+    label: "Case 57 — Confidentiality breach",
+    stationType: "OSCE"
+  },
+  {
+    id: "case58-extraoral-sinus",
+    label: "Case 58 — Extraoral sinus",
+    stationType: "OSCE"
+  },
+  {
+    id: "case59-mucocele",
+    label: "Case 59 — Mucocele",
+    stationType: "OSCE"
+  },
+  {
+    id: "case60-fibroma",
+    label: "Case 60 — Fibroma",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
