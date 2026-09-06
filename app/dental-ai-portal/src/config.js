@@ -282,6 +282,31 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case51-intrusion",
+    label: "Case 51 — Intrusive luxation of a primary tooth",
+    stationType: "OSCE"
+  },
+  {
+    id: "case52-decayed-primary-molar",
+    label: "Case 52 — Decayed, non-vital primary molar",
+    stationType: "OSCE"
+  },
+  {
+    id: "case53-treatment-anterior-tooth",
+    label: "Case 53 — Treatment of missing anterior tooth",
+    stationType: "OSCE"
+  },
+  {
+    id: "case54-loose-crown",
+    label: "Case 54 — Loose crown",
+    stationType: "OSCE"
+  },
+  {
+    id: "case55-dislodged-bridge",
+    label: "Case 55 — Dislodged bridge",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
