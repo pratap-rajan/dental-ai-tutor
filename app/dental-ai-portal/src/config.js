@@ -332,6 +332,31 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case61-restoration-options",
+    label: "Case 61 — Restoration options for reversible pulpitis",
+    stationType: "OSCE"
+  },
+  {
+    id: "case62-blood-thinner",
+    label: "Case 62 — Extraction on rivaroxaban (blood thinner)",
+    stationType: "OSCE"
+  },
+  {
+    id: "case63-compliant-policies",
+    label: "Case 63 — Complaint policy",
+    stationType: "OSCE"
+  },
+  {
+    id: "case64-facial-nerve-paralysis",
+    label: "Case 64 — Transient facial nerve paralysis",
+    stationType: "OSCE"
+  },
+  {
+    id: "case65-invisalign",
+    label: "Case 65 — Invisalign",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
