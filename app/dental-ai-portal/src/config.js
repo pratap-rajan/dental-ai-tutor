@@ -357,6 +357,31 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case66-learning-disability",
+    label: "Case 66 — Consent and capacity: learning disability",
+    stationType: "OSCE"
+  },
+  {
+    id: "case67-hypoplastic-molar",
+    label: "Case 67 — Hypoplastic molar: balancing and compensating extraction",
+    stationType: "OSCE"
+  },
+  {
+    id: "case68-ohi",
+    label: "Case 68 — Oral hygiene instructions for fixed appliances",
+    stationType: "OSCE"
+  },
+  {
+    id: "case69-thumb-sucking",
+    label: "Case 69 — Thumb sucking: open bite and incompetent lips",
+    stationType: "OSCE"
+  },
+  {
+    id: "case70-temp-crown",
+    label: "Case 70 — Temporary crown aftercare",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
