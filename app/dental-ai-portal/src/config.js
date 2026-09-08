@@ -382,6 +382,46 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case71-polic-enquiries",
+    label: "Case 71 — Police enquiries",
+    stationType: "OSCE"
+  },
+  {
+    id: "case72-infective-endocarditis",
+    label: "Case 72 — Infective endocarditis and antibiotic prophylaxis",
+    stationType: "OSCE"
+  },
+  {
+    id: "case73-antibiotic-audit",
+    label: "Case 73 — Antibiotic prescribing audit",
+    stationType: "OSCE"
+  },
+  {
+    id: "case74-concussion-of-tooth",
+    label: "Case 74 — Concussion of the tooth",
+    stationType: "OSCE"
+  },
+  {
+    id: "case75-scope-of-practice",
+    label: "Case 75 — Scope of practice: referral to dental therapist",
+    stationType: "OSCE"
+  },
+  {
+    id: "case76-root-fracture",
+    label: "Case 76 — Root fracture",
+    stationType: "OSCE"
+  },
+  {
+    id: "case77-icp",
+    label: "Case 77 — Infection control policy",
+    stationType: "OSCE"
+  },
+  {
+    id: "case78-leison-on-lip",
+    label: "Case 78 — Lesion on the lip",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
