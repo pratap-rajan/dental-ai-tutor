@@ -422,6 +422,51 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case79-periapical-leison",
+    label: "Case 79 — Describing periapical lesions",
+    stationType: "OSCE"
+  },
+  {
+    id: "case80-broken-retainer",
+    label: "Case 80 — Broken retainer",
+    stationType: "OSCE"
+  },
+  {
+    id: "case81-broken-denture",
+    label: "Case 81 — Broken denture",
+    stationType: "OSCE"
+  },
+  {
+    id: "case82-fractured-cusp",
+    label: "Case 82 — Fractured cusp",
+    stationType: "OSCE"
+  },
+  {
+    id: "case83-postop-sensitivity-filling",
+    label: "Case 83 — Sensitivity post composite filling",
+    stationType: "OSCE"
+  },
+  {
+    id: "case84-postop-sensitivity-bleaching",
+    label: "Case 84 — Post-operative sensitivity from bleaching",
+    stationType: "OSCE"
+  },
+  {
+    id: "case85-methotrexate",
+    label: "Case 85 — Patient on methotrexate",
+    stationType: "OSCE"
+  },
+  {
+    id: "case86-tongue-piercing",
+    label: "Case 86 — Tongue piercing",
+    stationType: "OSCE"
+  },
+  {
+    id: "case87-papilloma-on-roof",
+    label: "Case 87 — Papilloma on roof of the mouth",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
