@@ -18,9 +18,10 @@ export default function Hero({ onCtaClick }) {
         </h1>
 
         <p style={styles.subhead}>
-          Upload your OSCE or DTP practice recording and get structured,
-          examiner-style feedback within minutes — no waiting for a tutor
-          slot, no scheduling required.
+          Upload your OSCE, SCR, or DTP practice recording and get
+          structured, examiner-style feedback within minutes — no waiting
+          for a tutor slot, no scheduling required. Every report is saved
+          to your portal, so you can come back and view it anytime.
         </p>
 
         <div style={styles.ctaRow}>
@@ -39,8 +40,6 @@ export default function Hero({ onCtaClick }) {
           <Pill>Examiner-style scorecards</Pill>
           <Pill>Feedback by email</Pill>
         </div>
-
-        <DemoCard />
       </div>
     </section>
   );
@@ -60,55 +59,6 @@ function CheckMark() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.teal} strokeWidth="2.5" style={{ flexShrink: 0 }}>
       <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-function DemoCard() {
-  return (
-    <div style={styles.demoCard}>
-      <div style={styles.demoHeader}>
-        <div style={styles.demoHeaderLeft}>
-          <span style={styles.demoDotRow}>
-            <span style={{ ...styles.demoDot, background: "#f87171" }} />
-            <span style={{ ...styles.demoDot, background: "#fbbf24" }} />
-            <span style={{ ...styles.demoDot, background: "#4ade80" }} />
-          </span>
-          <span style={styles.demoTitle}>Case 2 · Amalgam toxicity concerns</span>
-        </div>
-        <span style={styles.demoStatus}>Feedback ready</span>
-      </div>
-
-      <div style={styles.demoBody}>
-        <div style={styles.demoScoreRow}>
-          <div>
-            <div style={styles.demoScoreNum}>75%</div>
-            <div style={styles.demoScoreLabel}>Overall score</div>
-          </div>
-          <div style={styles.demoGradeChip}>Meets standard</div>
-        </div>
-
-        <div style={styles.demoDivider} />
-
-        <div style={styles.demoFeedbackRow}>
-          <span style={styles.demoFeedbackDot} />
-          <div>
-            <div style={styles.demoFeedbackTitle}>WHO safe limits &amp; statistics</div>
-            <div style={styles.demoFeedbackText}>
-              Correctly cited 30 mcg/day vs 7.4 mcg/day — clear, patient-friendly comparison.
-            </div>
-          </div>
-        </div>
-        <div style={styles.demoFeedbackRow}>
-          <span style={{ ...styles.demoFeedbackDot, background: theme.mint, opacity: 0.5 }} />
-          <div>
-            <div style={styles.demoFeedbackTitle}>FDA guidance &amp; clinical evidence</div>
-            <div style={styles.demoFeedbackText}>
-              Partial coverage — the full four-point FDA position should be stated.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -228,64 +178,5 @@ const styles = {
     border: `1px solid ${theme.navyLighter}`,
     padding: "6px 14px",
     borderRadius: 999
-  },
-  demoCard: {
-    width: "100%",
-    maxWidth: 460,
-    background: theme.pageBgLight,
-    border: `1px solid ${theme.navyLighter}`,
-    borderRadius: 16,
-    overflow: "hidden",
-    textAlign: "left",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.45)"
-  },
-  demoHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "14px 18px",
-    borderBottom: `1px solid ${theme.navyLighter}`
-  },
-  demoHeaderLeft: { display: "flex", alignItems: "center", gap: 10 },
-  demoDotRow: { display: "flex", gap: 4 },
-  demoDot: { width: 8, height: 8, borderRadius: "50%", display: "inline-block" },
-  demoTitle: { fontSize: 13, color: theme.mint, fontWeight: 500, fontFamily: fonts.mono },
-  demoStatus: {
-    fontSize: 11,
-    fontWeight: 600,
-    color: theme.ctaMint,
-    background: "rgba(114, 212, 196, 0.12)",
-    padding: "4px 10px",
-    borderRadius: 999,
-    fontFamily: fonts.mono
-  },
-  demoBody: { padding: "18px" },
-  demoScoreRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16
-  },
-  demoScoreNum: { fontSize: 32, fontWeight: 700, color: theme.white, fontFamily: fonts.display, lineHeight: 1 },
-  demoScoreLabel: { fontSize: 12, color: theme.mint, opacity: 0.7, marginTop: 4 },
-  demoGradeChip: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: "#06231d",
-    background: theme.ctaMint,
-    padding: "6px 12px",
-    borderRadius: 999
-  },
-  demoDivider: { height: 1, background: theme.navyLighter, margin: "0 0 16px" },
-  demoFeedbackRow: { display: "flex", gap: 10, marginBottom: 14, alignItems: "flex-start" },
-  demoFeedbackDot: {
-    width: 6,
-    height: 6,
-    borderRadius: "50%",
-    background: theme.accentPurple,
-    marginTop: 6,
-    flexShrink: 0
-  },
-  demoFeedbackTitle: { fontSize: 13, fontWeight: 600, color: theme.white, marginBottom: 2 },
-  demoFeedbackText: { fontSize: 12.5, color: theme.mint, opacity: 0.75, lineHeight: 1.5 }
+  }
 };
