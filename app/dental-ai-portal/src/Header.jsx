@@ -3,6 +3,7 @@ import { theme, fonts } from "./theme.js";
 
 export default function Header({ onCtaClick, studentName, onSignOut, onShowReports }) {
   const [signOutHovered, setSignOutHovered] = useState(false);
+  const [reportsHovered, setReportsHovered] = useState(false);
 
   return (
     <header style={styles.header}>
@@ -16,7 +17,18 @@ export default function Header({ onCtaClick, studentName, onSignOut, onShowRepor
           {studentName && (
             <div style={styles.identity}>
               <span style={styles.studentName}>{studentName}</span>
-              <button style={styles.reportsButton} onClick={onShowReports}>
+              <button
+                style={{
+                  ...styles.reportsButton,
+                  borderColor: reportsHovered ? theme.tealGlow : theme.navyLighter,
+                  color: reportsHovered ? theme.tealGlow : theme.mint,
+                  background: reportsHovered ? "rgba(99,209,230,0.14)" : "transparent",
+                  boxShadow: reportsHovered ? `0 0 18px -4px ${theme.tealGlow}99` : "none"
+                }}
+                onMouseEnter={() => setReportsHovered(true)}
+                onMouseLeave={() => setReportsHovered(false)}
+                onClick={onShowReports}
+              >
                 My Reports
               </button>
               <button
@@ -120,7 +132,8 @@ const styles = {
     borderRadius: 6,
     cursor: "pointer",
     fontFamily: fonts.body,
-    whiteSpace: "nowrap"
+    whiteSpace: "nowrap",
+    transition: "background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease"
   },
   cta: {
     background: theme.ctaMint,
