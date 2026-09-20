@@ -593,17 +593,17 @@ export const CASE_CATALOG = [
   },
   {
     id: "case27-scr-multiple-dental-caries",
-    label: "Case 27 — Multiple dental caries, social deprivation and depression (Jul-Case7)",
+    label: "Case 27 — Multiple dental caries (Jul-Case7)",
     stationType: "SCR"
   },
   {
     id: "case28-scr-ul2-periapical-abscess",
-    label: "Case 28 — UL2 periapical abscess + LL7 pulpal disease (Jul-Case8)",
+    label: "Case 28 — UL2 periapical abscess (Jul-Case8)",
     stationType: "SCR"
   },
   {
     id: "case29-scr-discoloured-crown",
-    label: "Case 29 — Discoloured crown on an RCT-treated tooth (Jul-Case9)",
+    label: "Case 29 — Discoloured crown (Jul-Case9)",
     stationType: "SCR"
   }
 ];
