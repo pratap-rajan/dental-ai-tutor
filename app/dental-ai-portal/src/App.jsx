@@ -10,7 +10,7 @@ import MyReports from "./MyReports.jsx";
 import { useAuth } from "./AuthContext.jsx";
 
 const STORAGE_KEY = "planore_pending_submission";
-const COOLDOWN_MS = 200000; // matches Confirmation.jsx's "settle" timer
+const COOLDOWN_MS = 90000; // matches Confirmation.jsx's "settle" timer
 
 export default function App() {
   const [submission, setSubmission] = useState(null);

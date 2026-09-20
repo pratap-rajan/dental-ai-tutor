@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { theme, fonts } from "./theme.js";
 
 function stageForElapsed(elapsedMs) {
-  if (elapsedMs >= 200000) return 3;
+  if (elapsedMs >= 90000) return 3;
   if (elapsedMs >= 40000) return 2;
   return 1;
 }
