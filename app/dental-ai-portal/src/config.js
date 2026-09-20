@@ -590,6 +590,21 @@ export const CASE_CATALOG = [
     id: "case26-scr-dental-extraction-rivaroxaban",
     label: "Case 26 — Extraction on rivaroxaban",
     stationType: "SCR"
+  },
+  {
+    id: "case27-scr-multiple-dental-caries",
+    label: "Case 27 — Multiple dental caries, social deprivation and depression",
+    stationType: "SCR"
+  },
+  {
+    id: "case28-scr-ul2-periapical-abscess",
+    label: "Case 28 — UL2 periapical abscess + LL7 pulpal disease",
+    stationType: "SCR"
+  },
+  {
+    id: "case29-scr-discoloured-crown",
+    label: "Case 29 — Discoloured crown on an RCT-treated tooth",
+    stationType: "SCR"
   }
 ];
 
