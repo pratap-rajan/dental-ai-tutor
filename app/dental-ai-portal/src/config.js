@@ -635,6 +635,21 @@ export const CASE_CATALOG = [
     id: "case35-scr-gum-disease",
     label: "Case 35 — Gum Disease (Jul-Case6)",
     stationType: "SCR"
+  },
+  {
+    id: "case36-scr-colleague-issues",
+    label: "Case 36 — Colleague Issues (Jul-Case1)",
+    stationType: "SCR"
+  },
+  {
+    id: "case37-scr-carious-molars",
+    label: "Case 37 — Carious Molars in 8 Year Old (Jul-Case2)",
+    stationType: "SCR"
+  },
+  {
+    id: "case38-scr-kickboxer",
+    label: "Case 38 — Kickboxer Trauma Tooth (Jul-Case3)",
+    stationType: "SCR"
   }
 ];
 
