@@ -620,6 +620,21 @@ export const CASE_CATALOG = [
     id: "case32-scr-child-with-mih",
     label: "Case 32 — Child with MIH and posterior caries (Jul-Case12)",
     stationType: "SCR"
+  },
+  {
+    id: "case33-scr-sugar-tax",
+    label: "Case 33 — Sugar Tax (Jul-Case4)",
+    stationType: "SCR"
+  },
+  {
+    id: "case34-scr-mronj",
+    label: "Case 34 — MRONJ (Jul-Case5)",
+    stationType: "SCR"
+  },
+  {
+    id: "case35-scr-gum-disease",
+    label: "Case 35 — Gum Disease (Jul-Case6)",
+    stationType: "SCR"
   }
 ];
 
