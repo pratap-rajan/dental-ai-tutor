@@ -650,6 +650,21 @@ export const CASE_CATALOG = [
     id: "case38-scr-kickboxer",
     label: "Case 38 — Kickboxer Trauma Tooth (Jul-Case3)",
     stationType: "SCR"
+  },
+  {
+    id: "case39-scr-mih",
+    label: "Case 39 — MIH (Jun-Case1)",
+    stationType: "SCR"
+  },
+  {
+    id: "case40-scr-implant-ul1-edentulous",
+    label: "Case 40 — Implant and UL1 Edentulous Space, Generalised Gingivitis (Jun-Case2)",
+    stationType: "SCR"
+  },
+  {
+    id: "case41-scr-radicular-cyst",
+    label: "Case 41 — Radicular Cyst (Jun-Case3)",
+    stationType: "SCR"
   }
 ];
 
