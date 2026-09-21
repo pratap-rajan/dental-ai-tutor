@@ -605,6 +605,21 @@ export const CASE_CATALOG = [
     id: "case29-scr-discoloured-crown",
     label: "Case 29 — Discoloured crown (Jul-Case9)",
     stationType: "SCR"
+  },
+  {
+    id: "case30-scr-dental-radiograph-audit",
+    label: "Case 30 — Dental radiograph audit (Jul-Case10)",
+    stationType: "SCR"
+  },
+  {
+    id: "case31-scr-adult-dental-trauma",
+    label: "Case 31 — Adult dental trauma, 31–41 (Jul-Case11)",
+    stationType: "SCR"
+  },
+  {
+    id: "case32-scr-child-with-mih",
+    label: "Case 32 — Child with MIH and posterior caries (Jul-Case12)",
+    stationType: "SCR"
   }
 ];
 
