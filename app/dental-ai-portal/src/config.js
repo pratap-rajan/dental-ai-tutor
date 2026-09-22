@@ -592,6 +592,66 @@ export const CASE_CATALOG = [
     stationType: "SCR"
   },
   {
+    id: "case39-scr-mih",
+    label: "Case 39 — MIH (Jun-Case1)",
+    stationType: "SCR"
+  },
+  {
+    id: "case40-scr-implant-ul1-edentulous",
+    label: "Case 40 — Implant and UL1 Edentulous Space, Generalised Gingivitis (Jun-Case2)",
+    stationType: "SCR"
+  },
+  {
+    id: "case41-scr-radicular-cyst",
+    label: "Case 41 — Radicular Cyst (Jun-Case3)",
+    stationType: "SCR"
+  },
+  {
+    id: "case42-scr-down-syndrome",
+    label: "Case 42 — Down Syndrome, Epilepsy, Learning Disability (Jun-Case4)",
+    stationType: "SCR"
+  },
+  {
+    id: "case43-scr-periapical-abscess",
+    label: "Case 43 — Periapical Abscess, Generalised Periodontitis (Jun-Case5)",
+    stationType: "SCR"
+  },
+  {
+    id: "case44-scr-oscc",
+    label: "Case 44 — Suspected Oral Squamous Cell Carcinoma (OSCC) (Jun-Case6)",
+    stationType: "SCR"
+  },
+  {
+    id: "case36-scr-colleague-issues",
+    label: "Case 36 — Colleague Issues (Jul-Case1)",
+    stationType: "SCR"
+  },
+  {
+    id: "case37-scr-carious-molars",
+    label: "Case 37 — Carious Molars in 8 Year Old (Jul-Case2)",
+    stationType: "SCR"
+  },
+  {
+    id: "case38-scr-kickboxer",
+    label: "Case 38 — Kickboxer Trauma Tooth (Jul-Case3)",
+    stationType: "SCR"
+  },
+  {
+    id: "case33-scr-sugar-tax",
+    label: "Case 33 — Sugar Tax (Jul-Case4)",
+    stationType: "SCR"
+  },
+  {
+    id: "case34-scr-mronj",
+    label: "Case 34 — MRONJ (Jul-Case5)",
+    stationType: "SCR"
+  },
+  {
+    id: "case35-scr-gum-disease",
+    label: "Case 35 — Gum Disease (Jul-Case6)",
+    stationType: "SCR"
+  },
+  {
     id: "case27-scr-multiple-dental-caries",
     label: "Case 27 — Multiple dental caries (Jul-Case7)",
     stationType: "SCR"
@@ -619,51 +679,6 @@ export const CASE_CATALOG = [
   {
     id: "case32-scr-child-with-mih",
     label: "Case 32 — Child with MIH and posterior caries (Jul-Case12)",
-    stationType: "SCR"
-  },
-  {
-    id: "case33-scr-sugar-tax",
-    label: "Case 33 — Sugar Tax (Jul-Case4)",
-    stationType: "SCR"
-  },
-  {
-    id: "case34-scr-mronj",
-    label: "Case 34 — MRONJ (Jul-Case5)",
-    stationType: "SCR"
-  },
-  {
-    id: "case35-scr-gum-disease",
-    label: "Case 35 — Gum Disease (Jul-Case6)",
-    stationType: "SCR"
-  },
-  {
-    id: "case36-scr-colleague-issues",
-    label: "Case 36 — Colleague Issues (Jul-Case1)",
-    stationType: "SCR"
-  },
-  {
-    id: "case37-scr-carious-molars",
-    label: "Case 37 — Carious Molars in 8 Year Old (Jul-Case2)",
-    stationType: "SCR"
-  },
-  {
-    id: "case38-scr-kickboxer",
-    label: "Case 38 — Kickboxer Trauma Tooth (Jul-Case3)",
-    stationType: "SCR"
-  },
-  {
-    id: "case39-scr-mih",
-    label: "Case 39 — MIH (Jun-Case1)",
-    stationType: "SCR"
-  },
-  {
-    id: "case40-scr-implant-ul1-edentulous",
-    label: "Case 40 — Implant and UL1 Edentulous Space, Generalised Gingivitis (Jun-Case2)",
-    stationType: "SCR"
-  },
-  {
-    id: "case41-scr-radicular-cyst",
-    label: "Case 41 — Radicular Cyst (Jun-Case3)",
     stationType: "SCR"
   }
 ];
