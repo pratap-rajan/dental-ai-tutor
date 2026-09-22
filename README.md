@@ -12,6 +12,12 @@ by email as a PDF and viewable/printable anytime from the portal's
 
 **Live portal:** https://planoreacademy.co.uk
 
+**Product direction note:** this React portal is now designated an
+**admin-only testing tool**, covering both the offline audio-recording
+upload flow (OSCE/SCR/DTP) and the AI-avatar-based practice sample
+below. A separate, dedicated portal for real Mock Exam simulation is
+planned as its own future build — this repo is not that portal.
+
 ---
 
 ## Table of Contents
@@ -34,6 +40,7 @@ by email as a PDF and viewable/printable anytime from the portal's
 - [My Reports (Student Report History)](#-my-reports-student-report-history)
 - [Email Delivery](#-email-delivery)
 - [IAM Permissions](#-iam-permissions)
+- [AI Avatar Practice — Sample (Admin Testing)](#-ai-avatar-practice--sample-admin-testing)
 - [Adding a New Case](#-adding-a-new-case)
 - [Deployment Guide](#-deployment-guide)
 - [Reliability Notes](#-reliability-notes)
@@ -64,9 +71,13 @@ by email as a PDF and viewable/printable anytime from the portal's
 | Report retention — last 3 months or 50 reports, whichever is fewer | ✅ Live |
 | Email delivery via Amazon SES, domain-authenticated (SPF/DKIM/DMARC) | ✅ Live |
 | SES production access (beyond sandbox limits) | ✅ Approved |
+| **AI Avatar practice tab — sample UI (setup screen + static live-call screen)** | ✅ Live (sample only) |
+| **Tavus PAL created and tone-calibrated for case3-avulsed-tooth** | ✅ Live (testing) |
+| **Backend Lambda to create a Tavus conversation** | ✅ Written, not yet deployed/wired to frontend |
 | Server-side Cognito token verification on upload | ❌ Not yet built — see Known Gaps |
 | In-portal admin approval UI | ❌ Not yet built — console/CLI only |
 | DTP station type | ❌ Planned, not yet built |
+| Real-time avatar embed (student actually talking to the PAL in-portal) | ❌ Not yet wired — `AvatarLiveSession.jsx` is still a static sample |
 
 ---
 
@@ -179,6 +190,7 @@ except the two API Gateway routes:
 | `assessment-transcribe` | **EventBridge Rule 1** | S3 `Object Created` under `student-uploads/` |
 | `delete-processed-recording` | **EventBridge Rule 3** | Amazon Transcribe `Job State Change` event, `status: COMPLETED` |
 | `dental-ai-assessment` | **EventBridge Rule 2** | S3 `Object Created`, wildcard `transcripts/*.json` |
+| `create-tavus-conversation` *(new, sample)* | **API Gateway** *(planned)* | `POST /create-avatar-session` — not yet wired to a route |
 
 Four genuinely different trigger mechanisms across the pipeline: three
 Lambdas fire from **EventBridge**, two fire from **API Gateway** (one
@@ -195,7 +207,8 @@ must be read from `event.requestContext.http.method` (not
 `event.httpMethod`). Get this wrong and the Lambda still deploys and
 "looks" fine — it just silently never matches the branch you wrote,
 which is exactly what happened once already with `list-student-reports`
-before being caught and fixed.
+before being caught and fixed. `create-tavus-conversation` was written
+against this same HTTP API v2 shape from the start.
 
 ---
 
@@ -733,6 +746,7 @@ aws lambda invoke \
 | `delete-processed-recording` | EventBridge Rule 3 | Deletes the original recording once transcription completes |
 | `dental-ai-assessment` | EventBridge Rule 2 | Runs the relevance check, timing gate (SCR), Knowledge Base retrieval, Bedrock scoring, HTML+PDF report generation, DynamoDB indexing, and email |
 | `list-student-reports` | API Gateway `GET /my-reports` (JWT authorizer) | Queries `student-reports` for the signed-in student's own email, returns presigned view/download URLs |
+| `create-tavus-conversation` *(new, sample)* | API Gateway `POST /create-avatar-session` *(planned route)* | Reads `TAVUS_API_KEY` from an environment variable, calls Tavus's `POST /v2/conversations` with `pal_id`/`face_id`, returns `conversationUrl`/`conversationId` |
 
 ---
 
@@ -912,9 +926,144 @@ since the signature is embedded in the URL.
 - `s3:GetObject` scoped to `reports/*` only
 - `dynamodb:Query` scoped to the `student-reports` table ARN
 
+**`create-tavus-conversation`** *(new, sample)*:
+- No AWS IAM permissions beyond default Lambda execution — it makes an
+  outbound HTTPS call to Tavus, not to any AWS service. The Tavus API
+  key itself is read from a plain **environment variable**
+  (`TAVUS_API_KEY`), a deliberate simpler-for-now choice over Secrets
+  Manager — see [AI Avatar Practice](#-ai-avatar-practice--sample-admin-testing)
+  for the trade-off this accepts.
+
 **Delegated approval IAM user** (for a non-owner reviewer):
 - `cognito-idp:ListUsers`, `AdminEnableUser`, `AdminDisableUser`,
   `AdminGetUser` scoped to the single User Pool ARN — nothing else
+
+---
+
+## 🎭 AI Avatar Practice — Sample (Admin Testing)
+
+A sample, non-production feature added to this portal: a new **"AI
+Avatar"** tab sits next to SCR in the station-type selector, letting an
+admin pick a case and a patient persona, then walk through a mock live
+video-call screen — a preview of what a real avatar-based mock exam
+could feel like, ahead of any commitment to the full build.
+
+**Product context:** the tech PO has directed that a full, dedicated
+Mock Exam simulation portal will be a separate future build. This
+avatar tab is *not* that portal — it's a scoped, admin-only sample
+inside the existing portal, useful for evaluating the concept and the
+underlying vendor (Tavus) before investing in the real thing.
+
+### Frontend — new tab, sample flow only
+
+- `config.js` — `STATION_TYPES` gained a fourth entry, `AVATAR` ("AI
+  Avatar"), immediately after `SCR`. Two new standalone catalogs,
+  deliberately kept separate from the real `CASE_CATALOG` since this
+  isn't wired into the OSCE/SCR/DTP pipeline:
+  - `AVATAR_CASE_CATALOG` — currently just `case3-avulsed-tooth`
+  - `AVATAR_PERSONAS` — `female`, `male`, `clinical` (three avatar
+    look options; these are local UI selection keys only, not real
+    Tavus IDs)
+- `UploadForm.jsx` — when the `AVATAR` tab is active, the existing
+  case/email/upload fields are swapped out for `<AvatarPractice />`;
+  every other tab is untouched.
+- `AvatarPractice.jsx` *(new)* — small controller component: shows
+  `AvatarSetup`, then swaps to `AvatarLiveSession` on "Start session."
+- `AvatarSetup.jsx` *(new)* — case dropdown (reuses the existing
+  `CaseSelect` component) plus the 3 persona cards.
+- `AvatarLiveSession.jsx` *(new)* — **a static sample**, not a real
+  call: video tile, gradient placeholder avatar, a fixed sample
+  caption, mic/camera/end-session controls. Explicitly labelled in the
+  UI ("Sample UI — this call isn't connected to a live avatar provider
+  yet") since it doesn't actually connect to anything yet.
+
+All three new components use the portal's real `theme.js` tokens and
+fonts — no new colors were introduced.
+
+### Vendor — Tavus, current terminology (PAL / Face)
+
+Tavus renamed its core concepts partway through this build:
+
+| Old name | New name | What it is |
+|---|---|---|
+| Persona | **PAL** (Personified Application Layer) | Behavior: system prompt, knowledge, objectives, guardrails |
+| Replica | **Face** | Visual likeness and voice |
+
+**Legacy fields still work** for backward compatibility
+(`/v2/personas`, `persona_id`, `/v2/replicas`, `replica_id`), but this
+project standardized on the **current** naming throughout — `/v2/pals`,
+`pal_id`, `default_face_id`, `face_id` — specifically so there's
+nothing to revisit later.
+
+One functional difference, not just naming: `default_face_id` is
+**required** on `POST /v2/pals` (the old `POST /v2/personas` made
+`default_replica_id` optional).
+
+### The sample PAL — Mrs Katherine (case3-avulsed-tooth)
+
+`create-pal.sh` — a curl script that creates a PAL via
+`POST /v2/pals`, with a full conversational system prompt casting the
+avatar as Mrs Katherine, a parent phoning in after her child's front
+tooth was knocked out (mirrors `case3-avulsed-tooth`'s real telephone-
+triage scenario). The prompt deliberately:
+
+- Keeps her in character as a caller, never an examiner or an AI
+- Only reveals clinical facts (timing, tooth condition, medical
+  history) when directly asked, not volunteered — this is what makes
+  the exercise actually test the student's questioning technique
+- Never hints at the "correct" clinical answer
+
+**Tone calibration (based on real testing):** the first version of
+this prompt made the PAL sound too panicked — described as sounding
+"fake" or like it was "begging" for an appointment. The prompt was
+revised to explicitly instruct **"worried, not panicked"** — normal
+pace, full sentences, concern conveyed through content rather than
+gasping or repeated pleading — with an explicit rule never to repeat a
+request more than once. If a future PAL still drifts toward either
+extreme, the next lever to try is trimming the CHARACTER STATE bullet
+list itself, since a long list of anxiety-inducing facts can bleed
+into tone even when the tone instruction says otherwise.
+
+A live PAL has been created from this script and confirmed working:
+`pal_id: pc08ef5b4df3`.
+
+**Gotcha hit while running this script:** an apostrophe (a contraction
+like `wasn't`) inside the JSON payload broke bash's single-quoting on
+the surrounding `--data '...'` block, causing a confusing `unexpected
+EOF` shell error with no obvious connection to the actual cause.
+Fixed by spelling out contractions in full (`did not` instead of
+`wasn't`). Any future edits to this script's prompt text need the same
+care — any `'` inside the single-quoted block will reproduce this
+exact error.
+
+### Backend — `create-tavus-conversation` Lambda (written, not yet deployed)
+
+A new Python Lambda, matching this project's existing Lambda
+conventions (HTTP API v2 event shape, `event.requestContext.http
+.method` for OPTIONS handling):
+
+- Reads the Tavus API key from a plain **environment variable**
+  (`TAVUS_API_KEY`) — a deliberate simpler-for-now choice over Secrets
+  Manager. Known trade-off, accepted for this testing stage: an env
+  var is visible in plain text to anyone with Lambda console/CLI read
+  access, whereas Secrets Manager keeps it encrypted at rest and out
+  of the console view. Worth revisiting before this becomes
+  student-facing.
+- Accepts `palId`, optional `faceId`, and `caseId` in the request body
+- Calls Tavus's `POST /v2/conversations` with `pal_id`/`face_id`,
+  using `urllib.request` (Python stdlib — no extra dependency/layer
+  needed, unlike `reportlab`)
+- Returns only `conversationUrl`/`conversationId` to the frontend —
+  the API key itself never reaches the browser at any point
+- CORS restricted to `https://www.planoreacademy.co.uk`, matching the
+  `www`-only origin convention already established for Cognito
+
+**Not yet done:** deploying this Lambda, wiring a real API Gateway
+route to it, calling it from `AvatarSetup.jsx`/`AvatarLiveSession.jsx`
+instead of the current static sample, mapping the 3 local persona
+keys (`female`/`male`/`clinical`) to real Tavus `faceId` values, and
+building the companion "end conversation" Lambda (`DELETE
+/v2/pals/{pal_id}` or the conversation-end equivalent).
 
 ---
 
@@ -1054,6 +1203,7 @@ aws dynamodb create-table \
   `ADMIN_NOTIFY_EMAIL` (optional), `SES_SENDER` (optional)
 - `list-student-reports`: `BUCKET_NAME`, `REGION`,
   `REPORTS_TABLE_NAME` (defaults to `student-reports`)
+- `create-tavus-conversation` *(new, sample)*: `TAVUS_API_KEY`
 
 ---
 
@@ -1094,6 +1244,13 @@ sit next to each other in the CORS console form and are easy to fill
 in backwards** — `authorization` needs to go in **Allow**-Headers (what
 the browser may send) not **Expose**-Headers (what it may read back).
 Both produce the identical masked-as-CORS symptom.
+
+**A single-quoted shell string breaks on any embedded apostrophe.**
+Hit while running `create-pal.sh`: a contraction like `wasn't` inside
+a `--data '...'` JSON payload silently terminates the outer bash
+string early, producing a confusing `unexpected EOF` error nowhere
+near the actual cause. Any script embedding free-form prompt text
+inside single quotes needs contractions spelled out in full.
 
 DLQs are attached to EventBridge rule targets to capture failed
 invocations for debugging.
@@ -1149,6 +1306,9 @@ invocations for debugging.
     overridden** against the `public.ecr.aws/lambda/python` base
     image — its default entrypoint expects a Lambda handler name as
     its argument, not an arbitrary shell command like `pip install`.
+11. **A single quoted `'` inside a bash `--data '...'` payload breaks
+    the string early.** Hit creating the Tavus PAL — see Reliability
+    Notes above.
 
 ---
 
@@ -1160,7 +1320,9 @@ invocations for debugging.
    (against Cognito's JWKS), expiry, `token_use`, or `client_id`
    before accepting a request. A disabled account is blocked from
    *signing in*, but a stale or crafted token calling the API directly
-   isn't yet rejected server-side.
+   isn't yet rejected server-side. The same gap applies to the new
+   `create-tavus-conversation` Lambda, which also has no auth check
+   yet.
 2. **No in-portal admin approval UI.** Reviewing and approving pending
    students is entirely console/CLI-based today.
 3. **Microsoft personal vs. organizational accounts** — see the
@@ -1189,6 +1351,17 @@ invocations for debugging.
 9. **Knowledge Base has no SCR content yet** — all 91 pre-loaded
     topics are OSCE-only; SCR cases currently retrieve nothing (handled
     gracefully as empty context) until SCR-specific topics are ingested.
+10. **AI Avatar practice is not yet a real feature** — `AvatarLiveSession.jsx`
+    is a static sample. `create-tavus-conversation` isn't deployed or
+    routed yet, there's no "end conversation" Lambda, and there's no
+    mapping from the 3 local persona keys to real Tavus `faceId` values.
+11. **`TAVUS_API_KEY` is a plain environment variable**, not Secrets
+    Manager — a deliberate simpler-for-now choice, visible in plain
+    text to anyone with Lambda console/CLI read access. Worth moving
+    to Secrets Manager before this becomes anything student-facing.
+12. **A dedicated Mock Exam simulation portal is a separate, not-yet-
+    started build.** This repo remains the admin-only testing ground
+    for both the offline-recording flow and the AI-avatar sample.
 
 ---
 
@@ -1209,5 +1382,10 @@ invocations for debugging.
 - Server-side token verification hardening
 - DTP station type
 
-**Phase 3 — Planned**
-- Live AI Study Buddy (voice-only roleplay patient, real-time loop)
+**Phase 3 — In progress (sample stage)**
+- AI Avatar practice tab added to this admin-only portal — sample UI
+  live, Tavus PAL created and tone-calibrated, backend Lambda written
+- Real-time avatar embed (wiring the live call screen to an actual
+  Tavus conversation) — not yet done
+- A separate, dedicated Mock Exam simulation portal — planned as its
+  own future build, not started
