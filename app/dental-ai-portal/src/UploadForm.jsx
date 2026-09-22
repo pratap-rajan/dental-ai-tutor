@@ -3,6 +3,7 @@ import { CASE_CATALOG, MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, RECAPTCHA_SITE_KEY,
 import { requestUploadUrl, uploadFileToS3 } from "./api.js";
 import { theme, fonts } from "./theme.js";
 import CaseSelect from "./caseselect.jsx";
+import AvatarPractice from "./AvatarPractice.jsx";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -186,6 +187,10 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
             })}
           </div>
 
+          {stationType === "AVATAR" ? (
+            <AvatarPractice />
+          ) : (
+          <>
           <div style={styles.field}>
             <label style={styles.label} htmlFor="case-select">Case</label>
             <CaseSelect
@@ -295,6 +300,8 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
               {" · "}
               <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" style={styles.captchaLink}>Terms</a>
             </p>
+          )}
+          </>
           )}
         </form>
       </div>

@@ -16,7 +16,22 @@ export const API_BASE_URL = "https://rc98xaw0tg.execute-api.eu-west-2.amazonaws.
 export const STATION_TYPES = [
   { id: "OSCE", label: "OSCE", enabled: true },
   { id: "DTP", label: "DTP", enabled: false },
-  { id: "SCR", label: "SCR", enabled: true }
+  { id: "SCR", label: "SCR", enabled: true },
+  { id: "AVATAR", label: "AI Avatar", enabled: true }
+];
+
+// Sample case + patient-avatar catalog for the AI Avatar practice tab.
+// This is a standalone placeholder list for the admin-facing sample —
+// intentionally separate from CASE_CATALOG above, since the live-session
+// flow isn't wired into the OSCE/SCR/DTP recording pipeline yet.
+export const AVATAR_CASE_CATALOG = [
+  { id: "case3-avulsed-tooth", label: "Case 3 — Avulsed tooth (telephone triage)" }
+];
+
+export const AVATAR_PERSONAS = [
+  { id: "female", label: "Female patient" },
+  { id: "male", label: "Male patient" },
+  { id: "clinical", label: "Clinical staff attire" }
 ];
 
 export const DEFAULT_STATION_TYPE = "OSCE";
