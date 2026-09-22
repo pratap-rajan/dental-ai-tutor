@@ -12,12 +12,6 @@ by email as a PDF and viewable/printable anytime from the portal's
 
 **Live portal:** https://planoreacademy.co.uk
 
-**Product direction note:** this React portal is now designated an
-**admin-only testing tool**, covering both the offline audio-recording
-upload flow (OSCE/SCR/DTP) and the AI-avatar-based practice sample
-below. A separate, dedicated portal for real Mock Exam simulation is
-planned as its own future build — this repo is not that portal.
-
 ---
 
 ## Table of Contents
@@ -40,7 +34,6 @@ planned as its own future build — this repo is not that portal.
 - [My Reports (Student Report History)](#-my-reports-student-report-history)
 - [Email Delivery](#-email-delivery)
 - [IAM Permissions](#-iam-permissions)
-- [AI Avatar Practice — Sample (Admin Testing)](#-ai-avatar-practice--sample-admin-testing)
 - [Adding a New Case](#-adding-a-new-case)
 - [Deployment Guide](#-deployment-guide)
 - [Reliability Notes](#-reliability-notes)
@@ -58,8 +51,8 @@ planned as its own future build — this repo is not that portal.
 | Google + Microsoft federated sign-in via Amazon Cognito | ✅ Live |
 | Admin bypass (instant access, no approval wait) | ✅ Live |
 | Manual student approval workflow | ✅ Live (console/CLI-based) |
-| 10 working OSCE cases, each with full marking + Knowledge Base augmentation | ✅ Live |
-| SCR (Structured Clinical Reasoning) station type — Case 1 live | ✅ Live |
+| **87 OSCE cases authored (Cases 1–87)**, each with full marking; Knowledge Base augmentation applies wherever a case's topic matches one of the 91 pre-loaded KB files — see [Known Gaps](#-known-gaps--next-steps) re: verifying that mapping at this scale | ⚠️ Authored & packaged — confirm S3 upload + `config.js` deploy status |
+| **SCR station type — 44 cases authored (Cases 1–44)** | ⚠️ Authored & packaged — confirm S3 upload + `config.js` deploy status |
 | Fully automated EventBridge pipeline (upload → transcribe → cleanup → assess) | ✅ Live |
 | MP4 / OGG / WAV recording support | ✅ Live |
 | Automatic recording deletion post-transcription (T&C compliance) | ✅ Live |
@@ -71,13 +64,19 @@ planned as its own future build — this repo is not that portal.
 | Report retention — last 3 months or 50 reports, whichever is fewer | ✅ Live |
 | Email delivery via Amazon SES, domain-authenticated (SPF/DKIM/DMARC) | ✅ Live |
 | SES production access (beyond sandbox limits) | ✅ Approved |
-| **AI Avatar practice tab — sample UI (setup screen + static live-call screen)** | ✅ Live (sample only) |
-| **Tavus PAL created and tone-calibrated for case3-avulsed-tooth** | ✅ Live (testing) |
-| **Backend Lambda to create a Tavus conversation** | ✅ Written, not yet deployed/wired to frontend |
 | Server-side Cognito token verification on upload | ❌ Not yet built — see Known Gaps |
 | In-portal admin approval UI | ❌ Not yet built — console/CLI only |
 | DTP station type | ❌ Planned, not yet built |
-| Real-time avatar embed (student actually talking to the PAL in-portal) | ❌ Not yet wired — `AvatarLiveSession.jsx` is still a static sample |
+
+> **Note on the two ⚠️ rows above:** case content for OSCE 1–87 and SCR
+> 1–44 has been authored, validated (JSON schema, domain/criteria
+> cross-checks, internal consistency between the marking matrix,
+> reference answer, and prompt template), and packaged into the
+> `cases/{caseId}/` 5-file structure this README documents. Whether
+> every batch has actually been uploaded to S3 and added to
+> `CASE_CATALOG` in `config.js` should be confirmed against the live
+> bucket and portal before treating the full range as production-ready
+> — update this table with the real confirmed count once verified.
 
 ---
 
@@ -190,7 +189,6 @@ except the two API Gateway routes:
 | `assessment-transcribe` | **EventBridge Rule 1** | S3 `Object Created` under `student-uploads/` |
 | `delete-processed-recording` | **EventBridge Rule 3** | Amazon Transcribe `Job State Change` event, `status: COMPLETED` |
 | `dental-ai-assessment` | **EventBridge Rule 2** | S3 `Object Created`, wildcard `transcripts/*.json` |
-| `create-tavus-conversation` *(new, sample)* | **API Gateway** *(planned)* | `POST /create-avatar-session` — not yet wired to a route |
 
 Four genuinely different trigger mechanisms across the pipeline: three
 Lambdas fire from **EventBridge**, two fire from **API Gateway** (one
@@ -207,8 +205,7 @@ must be read from `event.requestContext.http.method` (not
 `event.httpMethod`). Get this wrong and the Lambda still deploys and
 "looks" fine — it just silently never matches the branch you wrote,
 which is exactly what happened once already with `list-student-reports`
-before being caught and fixed. `create-tavus-conversation` was written
-against this same HTTP API v2 shape from the start.
+before being caught and fixed.
 
 ---
 
@@ -427,11 +424,13 @@ cases/
 │   │   ├── 02-periapical-xray.jpeg
 │   │   └── 03-sinus-tract-photo.jpeg
 │   ├── case-evaluation-matrix-extracted.txt   ← 4 domains, GDC codes + definitions
-│   ├── reference-knowledge.json     ← spoken-reasoning style, not scripted dialogue
+│   ├── reference-knowledge.json     ← Transcribe format — see note below
 │   ├── prompt-template.txt          ← domain scoring 1-4 + code_glossary instruction
 │   └── assessment-type.txt          ← contents: "SCR" (absence defaults to "OSCE")
 │
-└── caseN-.../                       ← same pattern for every case (10 OSCE + 1 SCR live)
+└── caseN-.../                       ← same pattern for every case
+                                         (87 OSCE + 44 SCR authored — see
+                                         What's Actually Live for deploy status)
 
 student-uploads/
 ├── case4-bleeding/
@@ -455,6 +454,18 @@ knowledge-base-sources/
 ├── periodontitis.txt.metadata.json
 └── ... (91 files total, one per OSCE topic)
 ```
+
+> **`reference-knowledge.json` schema — required, not optional.**
+> Every `reference-knowledge.json`, OSCE or SCR, must be a full Amazon
+> Transcribe-shaped JSON object:
+> `{ "jobName", "accountId", "status": "COMPLETED", "results": { "transcripts": [ { "transcript": "<the actual reference content, as a single string>" } ] } }`.
+> The reference content itself — a spoken monologue for SCR, a scripted
+> dialogue for OSCE — lives **inside** that `transcript` string. A file
+> missing the top-level `results` key deploys and looks fine, but
+> `dental-ai-assessment` throws `KeyError: 'results'` the first time a
+> student submits against that case — see
+> [Reliability Notes](#-reliability-notes) for how this was hit and
+> fixed on a batch of SCR cases.
 
 The `knowledge-base-sources/` prefix is a separate, independent
 structure from `cases/` — it's the raw material ingested into the
@@ -484,7 +495,7 @@ changes are needed to add a new case of either type:
 |---|---|
 | `case-study.jpeg` **or** `case-study.txt`, optionally **plus** `case-study-images/` | The clinical scenario. OSCE cases use exactly one of jpeg/txt; SCR cases typically use text **and** a folder of images together |
 | `case-evaluation-matrix-extracted.txt` | The official marking rubric — per-question for OSCE, per-domain (with GDC code + definition) for SCR |
-| `reference-knowledge.json` | Transcribe-format reference/model answer (a spoken monologue for SCR, a scripted dialogue for OSCE) |
+| `reference-knowledge.json` | Full Transcribe-format JSON (`results.transcripts[0].transcript`) — the reference content inside is a spoken monologue for SCR, a scripted dialogue for OSCE. See the schema note in [S3 Bucket Structure](#-s3-bucket-structure) — this is a hard requirement, not a style convention |
 | `prompt-template.txt` | The full examiner prompt |
 | `assessment-type.txt` *(optional)* | Contents `SCR` or `OSCE` — absence defaults to `OSCE`, so none of the original 10 cases needed retrofitting |
 
@@ -550,6 +561,17 @@ outcomes for dental professional education* (Dentist version,
 November 2023):
 https://www.gdc-uk.org/docs/default-source/education-and-cpd/safe-practitoner/spf-dentist.pdf
 
+Note: a meaningful share of the SCR source material used for Cases
+27–44 is drawn from real, anonymised candidate exam recalls rather
+than the GDC framework document directly, and several of those recall
+documents don't cite Safe Practitioner C/I/P/S codes per question at
+all — some instead reference the GDC's separate *Standards for the
+Dental Team* numbered principles. Where a case's own source material
+doesn't supply Safe Practitioner codes, none have been invented to
+fill the gap; the `code_glossary` for those cases will legitimately be
+sparser or empty for some domains. This is expected, not a data
+quality issue.
+
 ### Multi-image case studies
 
 `load_case_images()` in `dental-ai-assessment` loads every file under
@@ -592,12 +614,15 @@ tagging it with a `caseId` attribute, enabling **filtered retrieval**
 — a query for case4 only ever searches case4's own content, never
 cross-contaminating with unrelated cases' material.
 
-Only 10 of the 91 pre-loaded topics currently correspond to a live
-case; the remaining 81 are inert until a matching live case is built,
-at which point they become immediately useful with no re-ingestion
-needed. The Knowledge Base currently only covers OSCE topics — SCR
-cases retrieve nothing (an empty string, handled gracefully) until SCR
-topics are added.
+At original scale (10 live OSCE cases), only 10 of the 91 pre-loaded
+topics corresponded to a live case, with the remaining 81 inert until
+a matching case existed. With OSCE now authored up to Case 87, the
+actual topic-to-case correspondence needs re-checking — it's likely
+significantly higher than 10/91 now, but this hasn't been directly
+verified against the current `knowledge-base-sources/` file list (see
+Known Gaps). The Knowledge Base currently only covers OSCE topics —
+SCR cases retrieve nothing (an empty string, handled gracefully) until
+SCR topics are added.
 
 ### How it's used
 
@@ -746,7 +771,6 @@ aws lambda invoke \
 | `delete-processed-recording` | EventBridge Rule 3 | Deletes the original recording once transcription completes |
 | `dental-ai-assessment` | EventBridge Rule 2 | Runs the relevance check, timing gate (SCR), Knowledge Base retrieval, Bedrock scoring, HTML+PDF report generation, DynamoDB indexing, and email |
 | `list-student-reports` | API Gateway `GET /my-reports` (JWT authorizer) | Queries `student-reports` for the signed-in student's own email, returns presigned view/download URLs |
-| `create-tavus-conversation` *(new, sample)* | API Gateway `POST /create-avatar-session` *(planned route)* | Reads `TAVUS_API_KEY` from an environment variable, calls Tavus's `POST /v2/conversations` with `pal_id`/`face_id`, returns `conversationUrl`/`conversationId` |
 
 ---
 
@@ -926,144 +950,9 @@ since the signature is embedded in the URL.
 - `s3:GetObject` scoped to `reports/*` only
 - `dynamodb:Query` scoped to the `student-reports` table ARN
 
-**`create-tavus-conversation`** *(new, sample)*:
-- No AWS IAM permissions beyond default Lambda execution — it makes an
-  outbound HTTPS call to Tavus, not to any AWS service. The Tavus API
-  key itself is read from a plain **environment variable**
-  (`TAVUS_API_KEY`), a deliberate simpler-for-now choice over Secrets
-  Manager — see [AI Avatar Practice](#-ai-avatar-practice--sample-admin-testing)
-  for the trade-off this accepts.
-
 **Delegated approval IAM user** (for a non-owner reviewer):
 - `cognito-idp:ListUsers`, `AdminEnableUser`, `AdminDisableUser`,
   `AdminGetUser` scoped to the single User Pool ARN — nothing else
-
----
-
-## 🎭 AI Avatar Practice — Sample (Admin Testing)
-
-A sample, non-production feature added to this portal: a new **"AI
-Avatar"** tab sits next to SCR in the station-type selector, letting an
-admin pick a case and a patient persona, then walk through a mock live
-video-call screen — a preview of what a real avatar-based mock exam
-could feel like, ahead of any commitment to the full build.
-
-**Product context:** the tech PO has directed that a full, dedicated
-Mock Exam simulation portal will be a separate future build. This
-avatar tab is *not* that portal — it's a scoped, admin-only sample
-inside the existing portal, useful for evaluating the concept and the
-underlying vendor (Tavus) before investing in the real thing.
-
-### Frontend — new tab, sample flow only
-
-- `config.js` — `STATION_TYPES` gained a fourth entry, `AVATAR` ("AI
-  Avatar"), immediately after `SCR`. Two new standalone catalogs,
-  deliberately kept separate from the real `CASE_CATALOG` since this
-  isn't wired into the OSCE/SCR/DTP pipeline:
-  - `AVATAR_CASE_CATALOG` — currently just `case3-avulsed-tooth`
-  - `AVATAR_PERSONAS` — `female`, `male`, `clinical` (three avatar
-    look options; these are local UI selection keys only, not real
-    Tavus IDs)
-- `UploadForm.jsx` — when the `AVATAR` tab is active, the existing
-  case/email/upload fields are swapped out for `<AvatarPractice />`;
-  every other tab is untouched.
-- `AvatarPractice.jsx` *(new)* — small controller component: shows
-  `AvatarSetup`, then swaps to `AvatarLiveSession` on "Start session."
-- `AvatarSetup.jsx` *(new)* — case dropdown (reuses the existing
-  `CaseSelect` component) plus the 3 persona cards.
-- `AvatarLiveSession.jsx` *(new)* — **a static sample**, not a real
-  call: video tile, gradient placeholder avatar, a fixed sample
-  caption, mic/camera/end-session controls. Explicitly labelled in the
-  UI ("Sample UI — this call isn't connected to a live avatar provider
-  yet") since it doesn't actually connect to anything yet.
-
-All three new components use the portal's real `theme.js` tokens and
-fonts — no new colors were introduced.
-
-### Vendor — Tavus, current terminology (PAL / Face)
-
-Tavus renamed its core concepts partway through this build:
-
-| Old name | New name | What it is |
-|---|---|---|
-| Persona | **PAL** (Personified Application Layer) | Behavior: system prompt, knowledge, objectives, guardrails |
-| Replica | **Face** | Visual likeness and voice |
-
-**Legacy fields still work** for backward compatibility
-(`/v2/personas`, `persona_id`, `/v2/replicas`, `replica_id`), but this
-project standardized on the **current** naming throughout — `/v2/pals`,
-`pal_id`, `default_face_id`, `face_id` — specifically so there's
-nothing to revisit later.
-
-One functional difference, not just naming: `default_face_id` is
-**required** on `POST /v2/pals` (the old `POST /v2/personas` made
-`default_replica_id` optional).
-
-### The sample PAL — Mrs Katherine (case3-avulsed-tooth)
-
-`create-pal.sh` — a curl script that creates a PAL via
-`POST /v2/pals`, with a full conversational system prompt casting the
-avatar as Mrs Katherine, a parent phoning in after her child's front
-tooth was knocked out (mirrors `case3-avulsed-tooth`'s real telephone-
-triage scenario). The prompt deliberately:
-
-- Keeps her in character as a caller, never an examiner or an AI
-- Only reveals clinical facts (timing, tooth condition, medical
-  history) when directly asked, not volunteered — this is what makes
-  the exercise actually test the student's questioning technique
-- Never hints at the "correct" clinical answer
-
-**Tone calibration (based on real testing):** the first version of
-this prompt made the PAL sound too panicked — described as sounding
-"fake" or like it was "begging" for an appointment. The prompt was
-revised to explicitly instruct **"worried, not panicked"** — normal
-pace, full sentences, concern conveyed through content rather than
-gasping or repeated pleading — with an explicit rule never to repeat a
-request more than once. If a future PAL still drifts toward either
-extreme, the next lever to try is trimming the CHARACTER STATE bullet
-list itself, since a long list of anxiety-inducing facts can bleed
-into tone even when the tone instruction says otherwise.
-
-A live PAL has been created from this script and confirmed working:
-`pal_id: pc08ef5b4df3`.
-
-**Gotcha hit while running this script:** an apostrophe (a contraction
-like `wasn't`) inside the JSON payload broke bash's single-quoting on
-the surrounding `--data '...'` block, causing a confusing `unexpected
-EOF` shell error with no obvious connection to the actual cause.
-Fixed by spelling out contractions in full (`did not` instead of
-`wasn't`). Any future edits to this script's prompt text need the same
-care — any `'` inside the single-quoted block will reproduce this
-exact error.
-
-### Backend — `create-tavus-conversation` Lambda (written, not yet deployed)
-
-A new Python Lambda, matching this project's existing Lambda
-conventions (HTTP API v2 event shape, `event.requestContext.http
-.method` for OPTIONS handling):
-
-- Reads the Tavus API key from a plain **environment variable**
-  (`TAVUS_API_KEY`) — a deliberate simpler-for-now choice over Secrets
-  Manager. Known trade-off, accepted for this testing stage: an env
-  var is visible in plain text to anyone with Lambda console/CLI read
-  access, whereas Secrets Manager keeps it encrypted at rest and out
-  of the console view. Worth revisiting before this becomes
-  student-facing.
-- Accepts `palId`, optional `faceId`, and `caseId` in the request body
-- Calls Tavus's `POST /v2/conversations` with `pal_id`/`face_id`,
-  using `urllib.request` (Python stdlib — no extra dependency/layer
-  needed, unlike `reportlab`)
-- Returns only `conversationUrl`/`conversationId` to the frontend —
-  the API key itself never reaches the browser at any point
-- CORS restricted to `https://www.planoreacademy.co.uk`, matching the
-  `www`-only origin convention already established for Cognito
-
-**Not yet done:** deploying this Lambda, wiring a real API Gateway
-route to it, calling it from `AvatarSetup.jsx`/`AvatarLiveSession.jsx`
-instead of the current static sample, mapping the 3 local persona
-keys (`female`/`male`/`clinical`) to real Tavus `faceId` values, and
-building the companion "end conversation" Lambda (`DELETE
-/v2/pals/{pal_id}` or the conversation-end equivalent).
 
 ---
 
@@ -1088,11 +977,15 @@ building the companion "end conversation" Lambda (`DELETE
    for readability/collision-avoidance — nothing in the pipeline
    parses it)
 2. Upload `case-study.txt` **and** `case-study-images/` (sorted
-   filenames), `case-evaluation-matrix-extracted.txt` (4 domains, real
-   GDC codes + official definitions), `reference-knowledge.json` (a
-   spoken-reasoning monologue, not scripted dialogue), and
-   `prompt-template.txt` (domain 1-4 scoring + `code_glossary`
-   instruction — see SCR Case 1's files as the working template)
+   filenames) if genuine clinical images exist for the case,
+   `case-evaluation-matrix-extracted.txt` (4 domains, real GDC codes +
+   official definitions where the source material supplies them),
+   `reference-knowledge.json` (full Transcribe-format JSON — see the
+   schema note in [S3 Bucket Structure](#-s3-bucket-structure) — a
+   spoken-reasoning monologue inside `results.transcripts[0].transcript`,
+   not scripted dialogue), and `prompt-template.txt` (domain 1-4
+   scoring + `code_glossary` instruction — see SCR Case 1's files as
+   the working template)
 3. Upload `assessment-type.txt` containing `SCR` — easy to forget
    since it's the one file with no OSCE equivalent; its absence
    silently falls back to OSCE report rendering rather than erroring
@@ -1203,21 +1096,41 @@ aws dynamodb create-table \
   `ADMIN_NOTIFY_EMAIL` (optional), `SES_SENDER` (optional)
 - `list-student-reports`: `BUCKET_NAME`, `REGION`,
   `REPORTS_TABLE_NAME` (defaults to `student-reports`)
-- `create-tavus-conversation` *(new, sample)*: `TAVUS_API_KEY`
 
 ---
 
 ## 🔁 Reliability Notes
 
-**Recurring lesson, hit repeatedly across this project on three
-different AWS services now (EventBridge, Cognito, and API Gateway
-CORS):** a trigger/rule/config change made via the console UI can
-silently fail to save, or land in the visually-adjacent-but-wrong
-field. Always verify with a direct read-back CLI command
-(`describe-user-pool`, `list-rules`, `get-policy`,
-`aws apigatewayv2 get-api --query 'CorsConfiguration'`) before assuming
-a console click actually took effect — a screenshot of the console
-form is not sufficient evidence, only a fresh CLI read is.
+**Recurring lesson, hit repeatedly across this project on four
+different things now (EventBridge, Cognito, API Gateway CORS, and
+SCR's `reference-knowledge.json` schema):** a config or content change
+that "looks right" by eye can still be structurally wrong in a way
+that deploys cleanly and fails silently — or fails loudly, but only
+the first time a real student submission hits it. Always verify with
+a direct read-back or validation step (`describe-user-pool`,
+`list-rules`, `get-policy`,
+`aws apigatewayv2 get-api --query 'CorsConfiguration'`, or — for case
+content — actually `json.load()`-ing every `reference-knowledge.json`
+and asserting the `results.transcripts[0].transcript` path resolves)
+before assuming a change actually took effect. A screenshot or a
+"looks fine" read-through is not sufficient evidence.
+
+**Case-specific instance of the above:** a batch of SCR
+`reference-knowledge.json` files (initially built for Cases 27–29) was
+authored as a domain-structured object (`{ "case_id", "domains": [...] }`)
+instead of the required Transcribe envelope. Every other file
+(`case-study.txt`, the marking matrix, `prompt-template.txt`) was
+valid and internally consistent, so nothing caught the mismatch until
+a real student transcript was submitted against Case 27 in production
+and `dental-ai-assessment` threw `KeyError: 'results'`. The fix was
+mechanical — wrap the same structured content as a JSON string inside
+`results.transcripts[0].transcript`, so nothing about the actual
+reference content changed, only its envelope — but the same class of
+mistake was worth checking for across every other SCR case built the
+same way before assuming they were safe. **Takeaway for any future
+case-authoring pass:** validate the full file shape (not just "is this
+valid JSON") against a real sample already known to work in
+production, not just against the spec as written down.
 
 **Also recurring:** creating an EventBridge rule/target, or a Cognito
 trigger, **before** the target Lambda is actually deployed fails
@@ -1244,13 +1157,6 @@ sit next to each other in the CORS console form and are easy to fill
 in backwards** — `authorization` needs to go in **Allow**-Headers (what
 the browser may send) not **Expose**-Headers (what it may read back).
 Both produce the identical masked-as-CORS symptom.
-
-**A single-quoted shell string breaks on any embedded apostrophe.**
-Hit while running `create-pal.sh`: a contraction like `wasn't` inside
-a `--data '...'` JSON payload silently terminates the outer bash
-string early, producing a confusing `unexpected EOF` error nowhere
-near the actual cause. Any script embedding free-form prompt text
-inside single quotes needs contractions spelled out in full.
 
 DLQs are attached to EventBridge rule targets to capture failed
 invocations for debugging.
@@ -1306,9 +1212,15 @@ invocations for debugging.
     overridden** against the `public.ecr.aws/lambda/python` base
     image — its default entrypoint expects a Lambda handler name as
     its argument, not an arbitrary shell command like `pip install`.
-11. **A single quoted `'` inside a bash `--data '...'` payload breaks
-    the string early.** Hit creating the Tavus PAL — see Reliability
-    Notes above.
+11. **A `reference-knowledge.json` missing the top-level `results` key
+    deploys and uploads without any error, and passes casual review**
+    (it's valid JSON, it reads fine). It only fails at the moment a
+    real assessment runs, with `KeyError: 'results'` in the Lambda
+    logs. See the schema note in
+    [S3 Bucket Structure](#-s3-bucket-structure) and the matching
+    entry in [Reliability Notes](#-reliability-notes) — worth a
+    scripted validation pass over every case's file before trusting a
+    new batch is production-ready.
 
 ---
 
@@ -1320,9 +1232,7 @@ invocations for debugging.
    (against Cognito's JWKS), expiry, `token_use`, or `client_id`
    before accepting a request. A disabled account is blocked from
    *signing in*, but a stale or crafted token calling the API directly
-   isn't yet rejected server-side. The same gap applies to the new
-   `create-tavus-conversation` Lambda, which also has no auth check
-   yet.
+   isn't yet rejected server-side.
 2. **No in-portal admin approval UI.** Reviewing and approving pending
    students is entirely console/CLI-based today.
 3. **Microsoft personal vs. organizational accounts** — see the
@@ -1340,7 +1250,8 @@ invocations for debugging.
    10 OSCE `prompt-template.txt` files still carry the old unanchored
    `confidence_assessment` instruction and haven't been retrofitted
    with the calibrated 0-100 rubric — same miscalibration risk exists
-   there, just not yet observed.
+   there, just not yet observed. With OSCE now at 87 authored cases,
+   this retrofit is worth doing as a batch pass rather than per-case.
 7. **`UploadForm.jsx` imports `./caseselect.jsx`** against the actual
    `CaseSelect.jsx` filename — works on macOS/Windows dev machines,
    untested against a Linux-based CI build (Amplify).
@@ -1349,19 +1260,33 @@ invocations for debugging.
    90-day boundary conditions haven't actually been hit in practice
    yet.
 9. **Knowledge Base has no SCR content yet** — all 91 pre-loaded
-    topics are OSCE-only; SCR cases currently retrieve nothing (handled
-    gracefully as empty context) until SCR-specific topics are ingested.
-10. **AI Avatar practice is not yet a real feature** — `AvatarLiveSession.jsx`
-    is a static sample. `create-tavus-conversation` isn't deployed or
-    routed yet, there's no "end conversation" Lambda, and there's no
-    mapping from the 3 local persona keys to real Tavus `faceId` values.
-11. **`TAVUS_API_KEY` is a plain environment variable**, not Secrets
-    Manager — a deliberate simpler-for-now choice, visible in plain
-    text to anyone with Lambda console/CLI read access. Worth moving
-    to Secrets Manager before this becomes anything student-facing.
-12. **A dedicated Mock Exam simulation portal is a separate, not-yet-
-    started build.** This repo remains the admin-only testing ground
-    for both the offline-recording flow and the AI-avatar sample.
+   topics are OSCE-only; SCR cases currently retrieve nothing (handled
+   gracefully as empty context) until SCR-specific topics are ingested.
+10. **Deployed-vs-authored case count needs reconciling.** 87 OSCE and
+    44 SCR cases have been authored, schema-validated, and packaged
+    into the standard `cases/{caseId}/` structure — but this README's
+    "What's Actually Live" table can't yet confirm how many of those
+    batches have actually been uploaded to S3 and added to
+    `CASE_CATALOG` in `config.js`. Worth a quick audit (`aws s3 ls
+    s3://planore-ai-tutor/cases/ | wc -l` against the count of entries
+    in `config.js`) to close this out and update the table with a real
+    number.
+11. **OSCE-to-Knowledge-Base topic correspondence needs re-checking at
+    the new scale.** The "10 of 91 topics live" figure was accurate
+    when there were only 10 OSCE cases; with 87 now authored, the real
+    overlap with the 91 pre-loaded `knowledge-base-sources/` files is
+    unverified and likely higher — worth a direct comparison pass once
+    the deployed case list is confirmed (see point 10).
+12. **A scripted validation pass across all authored case files would
+    catch the class of bug behind the `results`-key incident before
+    it reaches production** — e.g. a small script that, for every
+    `caseId` under `cases/`, loads `reference-knowledge.json` and
+    asserts `results.transcripts[0].transcript` resolves and is a
+    non-empty string, checks `prompt-template.txt` contains all five
+    expected placeholders, and cross-checks the domain/criteria count
+    between the marking matrix and the prompt's worked example. Not
+    built yet; would have caught the Case 27 incident before a student
+    ever hit it.
 
 ---
 
@@ -1375,17 +1300,16 @@ invocations for debugging.
 - Cognito federated authentication and approval workflow (mostly
   live — see Known Gaps)
 - Bedrock Knowledge Base / RAG (live, 91 topics pre-loaded, OSCE only)
-- SCR station type (live — Case 1; scaling to more cases in progress)
+- SCR station type — 44 cases authored (Cases 1–44); confirm live
+  deploy count (see Known Gaps, point 10)
+- OSCE case library — 87 cases authored (Cases 1–87); confirm live
+  deploy count (see Known Gaps, point 10)
 - PDF reports, per-student report history, and retention (live)
-- Scaling toward 300 cases (10 OSCE + 1 SCR live)
+- Scaling toward 300 cases — currently 131 authored (87 OSCE + 44
+  SCR) against that target, pending deploy confirmation
 - In-portal admin dashboard
 - Server-side token verification hardening
 - DTP station type
 
-**Phase 3 — In progress (sample stage)**
-- AI Avatar practice tab added to this admin-only portal — sample UI
-  live, Tavus PAL created and tone-calibrated, backend Lambda written
-- Real-time avatar embed (wiring the live call screen to an actual
-  Tavus conversation) — not yet done
-- A separate, dedicated Mock Exam simulation portal — planned as its
-  own future build, not started
+**Phase 3 — Planned**
+- Live AI Study Buddy (voice-only roleplay patient, real-time loop)
