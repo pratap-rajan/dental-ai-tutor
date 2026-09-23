@@ -3,7 +3,7 @@ import { AVATAR_CASE_CATALOG, AVATAR_PERSONAS } from "./config.js";
 import { theme, fonts } from "./theme.js";
 import CaseSelect from "./caseselect.jsx";
 
-export default function AvatarSetup({ onStart }) {
+export default function AvatarSetup({ onStart, starting, error }) {
   const [caseId, setCaseId] = useState(AVATAR_CASE_CATALOG[0]?.id ?? "");
   const [personaId, setPersonaId] = useState(AVATAR_PERSONAS[0]?.id ?? "");
 
@@ -43,12 +43,13 @@ export default function AvatarSetup({ onStart }) {
 
       <button
         type="button"
-        style={{ ...styles.startButton, opacity: caseId && personaId ? 1 : 0.6 }}
+        style={{ ...styles.startButton, opacity: caseId && personaId && !starting ? 1 : 0.6 }}
         onClick={() => onStart(caseId, personaId)}
-        disabled={!caseId || !personaId}
+        disabled={!caseId || !personaId || starting}
       >
-        Start session →
+        {starting ? "Connecting…" : "Start session →"}
       </button>
+      {error && <p style={styles.error}>{error}</p>}
       <p style={styles.hint}>Your microphone and camera will be requested when the call starts.</p>
     </div>
   );
@@ -112,6 +113,13 @@ const styles = {
     marginTop: 14,
     fontSize: 12.5,
     color: theme.slateLight,
+    textAlign: "center",
+    fontFamily: fonts.body
+  },
+  error: {
+    marginTop: 10,
+    fontSize: 12.5,
+    color: theme.danger,
     textAlign: "center",
     fontFamily: fonts.body
   }

@@ -100,3 +100,29 @@ export async function fetchMyReports(idToken) {
 
   return response.json();
 }
+
+/**
+ * Asks the backend to create a live Tavus conversation for the AI
+ * Avatar practice tab, and returns the conversationUrl to embed.
+ *
+ * Expected backend contract (create-tavus-conversation Lambda):
+ *   POST {API_BASE_URL}/create-avatar-session
+ *   body: { palId, faceId, caseId }
+ *   response: { conversationUrl, conversationId }
+ *
+ * faceId is optional — omit it to use the PAL's own default_face_id.
+ */
+export async function requestAvatarConversation({ palId, faceId, caseId }) {
+  const response = await fetch(`${API_BASE_URL}/create-avatar-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ palId, faceId, caseId })
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Could not start the avatar session (${response.status}). ${text}`.trim());
+  }
+
+  return response.json();
+}
