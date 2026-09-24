@@ -12,6 +12,12 @@ by email as a PDF and viewable/printable anytime from the portal's
 
 **Live portal:** https://planoreacademy.co.uk
 
+**Product direction note:** this React portal is now designated an
+**admin-only testing tool**, covering both the offline audio-recording
+upload flow (OSCE/SCR/DTP) and the AI-avatar-based practice engine
+below. A separate, dedicated portal for real Mock Exam simulation is
+planned as its own future build — this repo is not that portal.
+
 ---
 
 ## Table of Contents
@@ -34,6 +40,7 @@ by email as a PDF and viewable/printable anytime from the portal's
 - [My Reports (Student Report History)](#-my-reports-student-report-history)
 - [Email Delivery](#-email-delivery)
 - [IAM Permissions](#-iam-permissions)
+- [AI Avatar Engine — Tavus Integration (OSCE & SCR)](#-ai-avatar-engine--tavus-integration-osce--scr)
 - [Adding a New Case](#-adding-a-new-case)
 - [Deployment Guide](#-deployment-guide)
 - [Reliability Notes](#-reliability-notes)
@@ -64,6 +71,10 @@ by email as a PDF and viewable/printable anytime from the portal's
 | Report retention — last 3 months or 50 reports, whichever is fewer | ✅ Live |
 | Email delivery via Amazon SES, domain-authenticated (SPF/DKIM/DMARC) | ✅ Live |
 | SES production access (beyond sandbox limits) | ✅ Approved |
+| **AI Avatar tab — real live Tavus call embedded (case3-avulsed-tooth only)** | ✅ Live for 1 case |
+| **`ai-avatar-engine` Lambda — deployed, wired to `POST /create-avatar-session`, IAM confirmed** | ✅ Live |
+| **Tavus PAL created, tone-calibrated and facial-expression-calibrated** (`pal_id: pc08ef5b4df3`) | ✅ Live (1 PAL, 1 case) |
+| **AI Avatar Engine scaled to all 87 OSCE + 44 SCR cases** | ❌ Not yet built — see [AI Avatar Engine](#-ai-avatar-engine--tavus-integration-osce--scr) |
 | Server-side Cognito token verification on upload | ❌ Not yet built — see Known Gaps |
 | In-portal admin approval UI | ❌ Not yet built — console/CLI only |
 | DTP station type | ❌ Planned, not yet built |
@@ -104,6 +115,9 @@ PresignLambda["Lambda: presigned-upload-url
 ListReportsLambda["Lambda: list-student-reports
 (fires on: GET /my-reports, JWT authorizer)"]
 
+AvatarLambda["Lambda: ai-avatar-engine
+(fires on: POST /create-avatar-session)"]
+
 UploadBucket[(S3 — student-uploads/)]
 
 EB1[EventBridge Rule 1 — Object Created]
@@ -137,6 +151,8 @@ SES[Amazon SES]
 
 Email[Student Email — PDF attached]
 
+Tavus[Tavus — PAL + Face, live video call]
+
 Student --> Portal
 Portal --> Cognito
 Cognito --> Google
@@ -147,10 +163,17 @@ PostConfirmLambda -->|disable unless in Admins group| Cognito
 Portal -->|authenticated request| APIGW
 APIGW --> PresignLambda
 APIGW -->|JWT authorizer| ListReportsLambda
+APIGW --> AvatarLambda
 PresignLambda --> UploadBucket
 ListReportsLambda -->|query by student email from ID token| ReportsTable
 ListReportsLambda -->|presigned GET URLs| ReportBucket
 ListReportsLambda --> Portal
+
+AvatarLambda -->|POST /v2/conversations, pal_id + face_id| Tavus
+Tavus -->|conversationUrl| AvatarLambda
+AvatarLambda --> Portal
+Portal -->|embeds conversationUrl in an iframe| Tavus
+Student -->|live video call| Tavus
 
 UploadBucket --> EB1
 EB1 --> TranscribeLambda
@@ -179,7 +202,7 @@ SES --> Email
 
 This is the quick-reference version of the diagram above — every Lambda
 in this system is event-driven, never called directly by the frontend
-except the two API Gateway routes:
+except the three API Gateway routes:
 
 | Lambda | Triggered by | Trigger detail |
 |---|---|---|
@@ -189,9 +212,10 @@ except the two API Gateway routes:
 | `assessment-transcribe` | **EventBridge Rule 1** | S3 `Object Created` under `student-uploads/` |
 | `delete-processed-recording` | **EventBridge Rule 3** | Amazon Transcribe `Job State Change` event, `status: COMPLETED` |
 | `dental-ai-assessment` | **EventBridge Rule 2** | S3 `Object Created`, wildcard `transcripts/*.json` |
+| `ai-avatar-engine` | **API Gateway** | `POST /create-avatar-session` — no auth required yet (same known gap as `presigned-upload-url` — see Known Gaps); creates a live Tavus conversation |
 
-Four genuinely different trigger mechanisms across the pipeline: three
-Lambdas fire from **EventBridge**, two fire from **API Gateway** (one
+Five genuinely different trigger mechanisms across the pipeline: three
+Lambdas fire from **EventBridge**, three fire from **API Gateway** (two
 open, one JWT-authorized), and one fires from **Cognito's own trigger
 system** — each chosen because it's the natural event source for that
 step.
@@ -205,7 +229,8 @@ must be read from `event.requestContext.http.method` (not
 `event.httpMethod`). Get this wrong and the Lambda still deploys and
 "looks" fine — it just silently never matches the branch you wrote,
 which is exactly what happened once already with `list-student-reports`
-before being caught and fixed.
+before being caught and fixed. `ai-avatar-engine` was written against
+this same HTTP API v2 shape from the start.
 
 ---
 
@@ -342,6 +367,8 @@ participant Bedrock
 participant DynamoDB as student-reports table
 participant SES
 participant ListReportsLambda as list-student-reports
+participant AvatarLambda as ai-avatar-engine
+participant Tavus
 
 Student->>Portal: Click "Continue with Google/Microsoft"
 Portal->>Cognito: Redirect to /oauth2/authorize (PKCE)
@@ -398,6 +425,15 @@ DynamoDB-->>ListReportsLambda: Report history
 ListReportsLambda->>S3: Generate presigned GET URLs (HTML + PDF)
 ListReportsLambda-->>Portal: Report list + view/download links
 Portal-->>Student: View & print, or download PDF
+
+Student->>Portal: Click "AI Avatar" tab, pick case + persona, Start session
+Portal->>APIGW: POST /create-avatar-session
+APIGW->>AvatarLambda: Invoke
+AvatarLambda->>Tavus: POST /v2/conversations (pal_id, face_id)
+Tavus-->>AvatarLambda: conversationUrl, conversationId
+AvatarLambda-->>Portal: conversationUrl
+Portal->>Tavus: Load conversationUrl in an iframe
+Student->>Tavus: Live video conversation with the PAL
 ```
 
 ---
@@ -470,6 +506,10 @@ knowledge-base-sources/
 The `knowledge-base-sources/` prefix is a separate, independent
 structure from `cases/` — it's the raw material ingested into the
 Bedrock Knowledge Base, not directly read by the assessment Lambda.
+Tavus's own Knowledge Base (used by the AI Avatar Engine) is a
+**separate, third store** again — see
+[AI Avatar Engine](#-ai-avatar-engine--tavus-integration-osce--scr) —
+not to be confused with either of the above.
 
 **DynamoDB — `student-reports` table** (not S3, but the index over
 everything in `reports/`):
@@ -771,6 +811,7 @@ aws lambda invoke \
 | `delete-processed-recording` | EventBridge Rule 3 | Deletes the original recording once transcription completes |
 | `dental-ai-assessment` | EventBridge Rule 2 | Runs the relevance check, timing gate (SCR), Knowledge Base retrieval, Bedrock scoring, HTML+PDF report generation, DynamoDB indexing, and email |
 | `list-student-reports` | API Gateway `GET /my-reports` (JWT authorizer) | Queries `student-reports` for the signed-in student's own email, returns presigned view/download URLs |
+| `ai-avatar-engine` | API Gateway `POST /create-avatar-session` | Reads `TAVUS_API_KEY` from an environment variable, calls Tavus's `POST /v2/conversations` with `pal_id`/`face_id`, returns `conversationUrl`/`conversationId` |
 
 ---
 
@@ -804,6 +845,13 @@ A separate, short rejection-report template is used when the
 case-relevance pre-check fails, and a second one for SCR recordings
 exceeding the hard time limit — both are plain-text emails with no
 PDF/HTML attachment, since a rejection isn't a scored attempt.
+
+Note: the AI Avatar Engine (below) is a live conversation, not a
+recording submission — it does not go through this report-generation
+pipeline at all today. A student practising via the AI Avatar tab gets
+no scored report yet; see
+[AI Avatar Engine](#-ai-avatar-engine--tavus-integration-osce--scr)
+for what's built versus what's still missing there.
 
 ---
 
@@ -950,6 +998,23 @@ since the signature is embedded in the URL.
 - `s3:GetObject` scoped to `reports/*` only
 - `dynamodb:Query` scoped to the `student-reports` table ARN
 
+**`ai-avatar-engine`:**
+- No AWS IAM permissions beyond the default execution role
+  (`AWSLambdaBasicExecutionRole` — CloudWatch Logs only). This Lambda
+  never touches S3, DynamoDB, or Bedrock; its only outbound call is an
+  HTTPS request to `tavusapi.com`, which needs no IAM permission at
+  all (IAM governs calls within AWS, not to external APIs).
+- The permission that *does* matter is API Gateway's resource-based
+  invoke policy **on the Lambda itself** — confirmed via
+  `aws lambda get-policy --function-name ai-avatar-engine`, scoped
+  (via a `SourceArn` condition) to only the `orebuddy` API's
+  `/create-avatar-session` route, nothing broader.
+- The Tavus API key itself is read from a plain **environment
+  variable** (`TAVUS_API_KEY`), a deliberate simpler-for-now choice
+  over Secrets Manager — see
+  [AI Avatar Engine](#-ai-avatar-engine--tavus-integration-osce--scr)
+  for the trade-off this accepts.
+
 **Delegated approval IAM user** (for a non-owner reviewer):
 - `cognito-idp:ListUsers`, `AdminEnableUser`, `AdminDisableUser`,
   `AdminGetUser` scoped to the single User Pool ARN — nothing else
@@ -992,6 +1057,11 @@ since the signature is embedded in the URL.
 4. Add the case to `CASE_CATALOG` with `stationType: "SCR"` and
    redeploy — the SCR tab in the upload form filters on this field
    automatically
+
+**AI Avatar Engine (either type):** see
+[AI Avatar Engine — Adding a case](#adding-a-case-to-the-avatar-engine)
+below — a genuinely different process from the two above, since it
+doesn't reuse `CASE_CATALOG`'s recording-submission flow at all.
 
 ---
 
@@ -1096,6 +1166,337 @@ aws dynamodb create-table \
   `ADMIN_NOTIFY_EMAIL` (optional), `SES_SENDER` (optional)
 - `list-student-reports`: `BUCKET_NAME`, `REGION`,
   `REPORTS_TABLE_NAME` (defaults to `student-reports`)
+- `ai-avatar-engine`: `TAVUS_API_KEY`
+
+---
+
+## 🎭 AI Avatar Engine — Tavus Integration (OSCE & SCR)
+
+A live, real-time alternative to the recording-and-wait flow above:
+instead of recording an answer and waiting for an emailed report, the
+student talks face-to-face, in real time, with an AI patient avatar
+powered by Tavus. This sits in this admin-only portal as a new **"AI
+Avatar"** tab next to SCR — see the product-direction note at the top
+of this README re: this portal's role versus the planned dedicated
+Mock Exam portal.
+
+**Current status: proven for one case, not yet scaled.** Everything
+below that's marked ✅ works end-to-end today for
+`case3-avulsed-tooth`. Scaling this to all 87 OSCE + 44 SCR cases is
+the next real chunk of work, not yet started — see
+[Scaling to all cases](#scaling-to-all-cases-osce--scr) below for the
+planned approach.
+
+### Tavus terminology — PAL / Face (current), Persona / Replica (legacy)
+
+Tavus renamed its core concepts partway through this integration:
+
+| Old name | Current name | What it is |
+|---|---|---|
+| Persona | **PAL** (Personified Application Layer) | Behavior: system prompt, knowledge, objectives, guardrails |
+| Replica | **Face** | Visual likeness and voice |
+
+Legacy fields still work for backward compatibility (`/v2/personas`,
+`persona_id`, `/v2/replicas`, `replica_id`), but this project
+standardized on the **current** naming throughout — `/v2/pals`,
+`pal_id`, `default_face_id`, `face_id`. One functional difference, not
+just naming: `default_face_id` is **required** on `POST /v2/pals` (the
+old `POST /v2/personas` made `default_replica_id` optional).
+
+### What's built — frontend
+
+- `config.js` — `STATION_TYPES` gained a fourth entry, `AVATAR` ("AI
+  Avatar"), immediately after `SCR`. Two new standalone catalogs,
+  deliberately kept separate from the real `CASE_CATALOG` for now:
+  - `AVATAR_CASE_CATALOG` — currently just `case3-avulsed-tooth`
+  - `AVATAR_PERSONAS` — `female`, `male`, `clinical` (three avatar
+    look options; local UI selection keys, not Tavus IDs)
+- `UploadForm.jsx` — when the `AVATAR` tab is active, the existing
+  case/email/upload fields are swapped out for `<AvatarPractice />`.
+- `AvatarPractice.jsx` — controller component. On "Start session," it
+  calls the backend (`requestAvatarConversation` in `api.js`), which
+  hits `ai-avatar-engine`, gets back a real `conversationUrl`, and
+  switches to `AvatarLiveSession`.
+- `AvatarSetup.jsx` — case dropdown (reuses `CaseSelect`) plus the 3
+  persona cards; shows a "Connecting…" state and any error while the
+  backend call is in flight.
+- `AvatarLiveSession.jsx` — embeds the real `conversationUrl` in an
+  `<iframe>` (`allow="camera; microphone; autoplay; fullscreen;
+  display-capture"`). Tavus's own call UI (mic/camera controls,
+  captions) renders inside that iframe directly — this component does
+  **not** duplicate those controls itself, only an "End session"
+  button that returns to setup (does not yet call Tavus to end the
+  conversation server-side — see Known Gaps).
+- `CASE_PAL_MAP` and `PERSONA_FACE_MAP` inside `AvatarPractice.jsx` —
+  the current, single-case mapping from `caseId` → `pal_id` and
+  `personaId` → `faceId`. This is the piece that changes shape
+  entirely once scaled — see below.
+
+All components use the portal's real `theme.js` tokens and fonts — no
+new colors introduced.
+
+### What's built — backend (`ai-avatar-engine`)
+
+A Python Lambda matching this project's existing conventions (HTTP API
+v2 event shape, `event.requestContext.http.method` for OPTIONS):
+
+- Reads `TAVUS_API_KEY` from a plain environment variable — see the
+  IAM section above for the accepted trade-off
+- Accepts `palId`, optional `faceId`, and `caseId` in the request body
+- Calls Tavus's `POST /v2/conversations` via `urllib.request` (Python
+  stdlib — no extra dependency/layer, unlike `reportlab`)
+- Returns only `conversationUrl`/`conversationId` — the API key itself
+  never reaches the browser
+- Deployed, wired to `POST /create-avatar-session` on the `orebuddy`
+  API, integration confirmed (Lambda proxy integration), invoke
+  permission confirmed directly via `aws lambda get-policy`
+
+**CORS gotcha specific to this route:** API Gateway's CORS
+configuration is **API-wide**, and when configured at that level, *API
+Gateway ignores any CORS headers your Lambda's own code returns* — so
+the `cors_headers()` function inside `ai-avatar-engine`'s code
+(originally written scoped to `https://www.planoreacademy.co.uk`) is
+effectively dead code. The orebuddy API's existing wildcard
+`Access-Control-Allow-Origin: *` (already covering the other routes)
+is what the browser actually sees for this route too, with no route-
+specific CORS step needed. Worth knowing so a future CORS issue isn't
+chased inside this Lambda's code — the real config lives at the API
+level.
+
+### The one live PAL — Mrs Katherine (`case3-avulsed-tooth`)
+
+`pal_id: pc08ef5b4df3`. Built and refined through real testing, not
+written once and left alone:
+
+- **Tone, first pass:** made her sound too panicked — described as
+  sounding "fake" or "begging" for an appointment. Revised to an
+  explicit **"worried, not panicked"** instruction — normal pace, full
+  sentences, concern conveyed through content rather than gasping or
+  repeated pleading, with an explicit rule never to repeat a request
+  more than once.
+- **Facial expression, separately:** the default rendering looked like
+  a neutral "sales rep" smile despite the corrected speech tone —
+  voice and face are controlled independently in Tavus's model. Fixed
+  with a dedicated **FACIAL EXPRESSION** section in the same
+  `system_prompt` (furrowed brow, tense mouth, attentive eyes; never a
+  relaxed customer-service smile; softens only slightly, never into a
+  smile, as the caller is reassured).
+- Both fixes were applied via `PATCH /v2/pals/{pal_id}` (JSON Patch
+  format) — updating the existing PAL in place, not creating a
+  duplicate. Confirmed live via the returned `updated_at` timestamp
+  (no `publish_url` in the response, meaning no draft step was
+  needed).
+- `default_face_id: r4067604db72` — a **stock** face, not custom, so
+  it doesn't count against the account's Custom Replica slot limit.
+- `perception_model: raven-1` and `tts_emotion_control: true` were
+  already enabled by default — the facial-expression fix only needed a
+  prompt change, not a config change, once those were confirmed on.
+
+**Gotcha hit while running `create-pal.sh`/`patch-pal-expression.sh`:**
+an apostrophe (a contraction like `wasn't`) inside the JSON payload
+broke bash's single-quoting on the surrounding `--data '...'` block,
+producing a confusing `unexpected EOF` shell error with no obvious
+connection to the actual cause. Fixed by spelling out contractions in
+full (`did not` instead of `wasn't`) throughout the prompt text. Any
+future edits to this prompt need the same care.
+
+### Reference material — Tavus's own Knowledge Base
+
+Separate from both the Bedrock Knowledge Base and each case's own
+`reference-knowledge.json`, Tavus has its **own** document-based
+Knowledge Base (RAG) that a PAL can pull from live during a
+conversation — conceptually similar, but a genuinely different store,
+uploaded via `POST /v2/documents`, and attached to a PAL by
+`document_ids` or `document_tags`.
+
+- Supported formats: `.pdf`, `.txt`, `.docx`, `.doc`, `.png`, `.jpg`,
+  `.pptx`, `.csv`, `.xlsx`, or a website URL. 50MB file size limit.
+- The API only accepts a `document_url` (no raw multipart upload) —
+  but this does **not** require making the S3 bucket public. A
+  short-lived **presigned GET URL** (`aws s3 presign ... --expires-in
+  900`) works exactly the same way `presigned-upload-url` already
+  generates short-lived PUT URLs for student recordings — Tavus fetches
+  it once during processing, and the link is only ever valid for that
+  brief window.
+- The Developer Portal (`platform.tavus.io/documents`) also supports
+  direct local file upload with no URL step at all, useful for one-off
+  testing.
+- Important distinction from your existing reference material: Tavus's
+  Knowledge Base is for the PAL to pull **facts** from live during
+  conversation (like a support agent referencing a product FAQ) — it
+  is **not** the mechanism for controlling personality, tone, or
+  delivery, which stays entirely in `system_prompt` as built above.
+
+Not yet done for this project: no documents have been uploaded to
+Tavus's Knowledge Base yet. `case3-avulsed-tooth`'s PAL currently
+relies entirely on facts hand-written into its `system_prompt`
+(the CHARACTER STATE section), not on an attached reference document.
+
+### Scaling to all cases (OSCE & SCR)
+
+The current single-PAL, single-case setup does not scale to 87 OSCE +
+44 SCR cases by creating 131 separate PALs. Tavus's own documented
+guidance (**PAL Strategies**) splits into two approaches, and this
+project's cases fall clearly into the first:
+
+- **Reuse PALs + `conversational_context`** — when conversations need
+  different *data* (facts, identity, scenario) but the same
+  *behavior*. This fits every OSCE/SCR case here: the underlying
+  behavior — stay in character, only reveal facts when asked, the
+  worried-but-composed tone, the facial expression rules, never hint
+  at the diagnosis — is structurally identical across all 131 cases.
+  Only the data differs: which patient, what happened, what facts to
+  reveal, which reference material grounds the answers.
+- **Create a PAL per conversation** — reserved for cases needing
+  genuinely different *behavior* (different voice, tools, or
+  guardrails), which doesn't apply here.
+
+**Planned shape, not yet built:**
+
+1. **A small, fixed number of PALs** — likely one per persona look
+   (female / male / clinical), not one per case. Each PAL's
+   `system_prompt` holds only the *universal* behavioral rules
+   (currently baked case-specifically into `pc08ef5b4df3` — these need
+   separating out into a reusable, case-agnostic base prompt).
+2. **Per case, at conversation-creation time**, `ai-avatar-engine`
+   would pass:
+   - **`conversational_context`** — the specific scenario + character
+     facts for that one case, derived from the case's existing
+     `case-study.txt` (OSCE) or `case-study.txt`/`reference-knowledge.json`
+     (SCR) content, reformatted for a live-conversation phrasing rather
+     than the batch-grading phrasing those files currently carry
+   - **`document_tags`** — scoped to that case's own uploaded Tavus
+     document, so the PAL only ever pulls from the right case's
+     material, mirroring the exact `caseId`-tagging pattern already
+     proven at 91-file scale in the Bedrock Knowledge Base
+3. **A batch upload step** — looping every case's reference content
+   through presigned S3 URLs into `POST /v2/documents`, tagged by
+   `caseId`. Structurally the same ingestion job already run once for
+   the Bedrock Knowledge Base's 91 files, aimed at a different
+   destination.
+4. **`CASE_PAL_MAP`/`PERSONA_FACE_MAP` in `AvatarPractice.jsx`** change
+   shape — `caseId` stops mapping to a unique `pal_id`; instead it maps
+   to a `conversational_context` string and a `document_tags` value,
+   while `pal_id` stays fixed per persona.
+5. **A validation pass, learning directly from the `results`-key
+   incident** (see [Reliability Notes](#-reliability-notes)) — before
+   trusting a batch of 131 cases' worth of `conversational_context`
+   content and Tavus document uploads, script a check that each one
+   actually resolves and is non-empty, rather than discovering a
+   malformed one only when a real student hits it live.
+
+None of this is built yet. The next concrete step is deciding the
+`conversational_context` content structure for one case and proving
+the reuse pattern works for a second case (not just `case3`) before
+committing to a batch script across all 131.
+
+### Adding a case to the Avatar Engine
+
+Once the scaling approach above is actually built, adding a case here
+will look roughly like:
+
+1. Draft that case's `conversational_context` content (scenario +
+   character facts, phrased for live conversation)
+2. Upload any grounding reference material as a Tavus document, tagged
+   with that `caseId`
+3. Add an entry mapping `caseId` → its `conversational_context` +
+   `document_tags` in the frontend/Lambda lookup
+4. No new PAL, no code change to `ai-avatar-engine` itself — the same
+   shared persona-look PALs handle every case
+
+This is **not yet implemented** — today, adding a case here means
+hand-writing an entire new PAL's `system_prompt` from scratch (as was
+done once, for `case3-avulsed-tooth`), which is exactly the pattern
+the scaling work above is meant to replace.
+
+---
+
+## 🚀 Deployment Guide
+
+**Frontend (Amplify):**
+- `amplify.yml` must use the wrapped monorepo format (app lives at
+  `app/dental-ai-portal/`, not the repo root):
+  ```yaml
+  version: 1
+  applications:
+    - frontend:
+        phases:
+          preBuild:
+            commands:
+              - npm install
+          build:
+            commands:
+              - npm run build
+        artifacts:
+          baseDirectory: dist
+          files:
+            - '**/*'
+        cache:
+          paths:
+            - node_modules/**/*
+      appRoot: app/dental-ai-portal
+  ```
+
+**Cognito setup, high level:**
+1. Create the User Pool (Email as sign-in identifier, self-registration OFF)
+2. Register OAuth apps in Google Cloud Console and Azure — publish the
+   Google app to Production once basic-scopes-only (no formal
+   verification needed for `openid email profile`)
+3. Add both as federated identity providers in Cognito, enable them
+   per App Client (a separate step from adding at the User Pool level)
+4. Create the `Admins` group
+5. Deploy `cognito-post-confirmation-trigger`, attach it via
+   `update-user-pool --lambda-config` (verify via `describe-user-pool`
+   — console UI attachment can silently fail to save)
+6. Standardize every redirect/callback URL on the `www` subdomain
+   consistently (not the bare root domain) if the domain uses
+   forwarding rather than a true root-domain alias — bare vs. `www`
+   are different origins for `sessionStorage`/PKCE purposes
+7. For `/my-reports`: create a **JWT authorizer** (not the REST API
+   "Cognito User Pool" type) — Issuer
+   `https://cognito-idp.eu-west-2.amazonaws.com/<user-pool-id>`,
+   Audience = App Client ID — then explicitly attach it to the
+   `GET /my-reports` route (route-level, separate step from creating
+   the authorizer itself)
+
+**`reportlab` Lambda Layer (for PDF generation), buildable on Mac via Docker:**
+```bash
+mkdir -p ~/reportlab-layer-build/python
+cd ~/reportlab-layer-build
+
+docker run --rm --entrypoint "" \
+  -v "$PWD":/var/task -w /var/task \
+  public.ecr.aws/lambda/python:<runtime-version> \
+  pip install reportlab -t python
+
+zip -r reportlab-layer.zip python
+
+aws lambda publish-layer-version \
+  --layer-name reportlab \
+  --zip-file fileb://reportlab-layer.zip \
+  --compatible-runtimes <runtime-version> \
+  --region eu-west-2
+```
+Then attach the returned `LayerVersionArn` to `dental-ai-assessment`
+via the console's Layers panel, or `aws lambda update-function-configuration
+--layers <arn>`. Note the `--entrypoint ""` override — the AWS base
+image's own entrypoint expects a Lambda handler name as its argument,
+not a shell command, and fails with "entrypoint requires the handler
+name to be the first argument" without this override.
+
+**DynamoDB table:**
+```bash
+aws dynamodb create-table \
+  --table-name student-reports \
+  --attribute-definitions \
+      AttributeName=emailId,AttributeType=S \
+      AttributeName=reportTimestamp,AttributeType=S \
+  --key-schema \
+      AttributeName=emailId,KeyType=HASH \
+      AttributeName=reportTimestamp,KeyType=RANGE \
+  --billing-mode PAY_PER_REQUEST \
+  --region eu-west-2
+```
 
 ---
 
@@ -1130,7 +1531,10 @@ mistake was worth checking for across every other SCR case built the
 same way before assuming they were safe. **Takeaway for any future
 case-authoring pass:** validate the full file shape (not just "is this
 valid JSON") against a real sample already known to work in
-production, not just against the spec as written down.
+production, not just against the spec as written down. The same
+takeaway is exactly why the AI Avatar Engine's scaling plan explicitly
+calls for a validation pass before trusting a 131-case batch — see
+[AI Avatar Engine](#-ai-avatar-engine--tavus-integration-osce--scr).
 
 **Also recurring:** creating an EventBridge rule/target, or a Cognito
 trigger, **before** the target Lambda is actually deployed fails
@@ -1157,6 +1561,23 @@ sit next to each other in the CORS console form and are easy to fill
 in backwards** — `authorization` needs to go in **Allow**-Headers (what
 the browser may send) not **Expose**-Headers (what it may read back).
 Both produce the identical masked-as-CORS symptom.
+
+**When API Gateway CORS is configured at the API level, it overrides
+— not merges with — any CORS headers a Lambda's own code returns.**
+Hit while wiring `ai-avatar-engine`: the Lambda's own
+`cors_headers()` function, scoped to the real portal origin, is
+effectively unused, since the orebuddy API's existing wildcard CORS
+setting is what actually reaches the browser. Not a bug, just worth
+knowing before chasing a CORS issue inside Lambda code when the real
+config lives at the API level.
+
+**A single-quoted shell string breaks on any embedded apostrophe.**
+Hit while running `create-pal.sh`/`patch-pal-expression.sh`: a
+contraction like `wasn't` inside a `--data '...'` JSON payload
+silently terminates the outer bash string early, producing a confusing
+`unexpected EOF` error nowhere near the actual cause. Any script
+embedding free-form prompt text inside single quotes needs
+contractions spelled out in full.
 
 DLQs are attached to EventBridge rule targets to capture failed
 invocations for debugging.
@@ -1221,6 +1642,12 @@ invocations for debugging.
     entry in [Reliability Notes](#-reliability-notes) — worth a
     scripted validation pass over every case's file before trusting a
     new batch is production-ready.
+12. **A single quoted `'` inside a bash `--data '...'` payload breaks
+    the string early.** Hit creating and patching the Tavus PAL — see
+    Reliability Notes above.
+13. **API-level CORS in API Gateway silently overrides a Lambda's own
+    CORS headers, rather than merging with them.** Hit wiring
+    `ai-avatar-engine` — see Reliability Notes above.
 
 ---
 
@@ -1232,7 +1659,8 @@ invocations for debugging.
    (against Cognito's JWKS), expiry, `token_use`, or `client_id`
    before accepting a request. A disabled account is blocked from
    *signing in*, but a stale or crafted token calling the API directly
-   isn't yet rejected server-side.
+   isn't yet rejected server-side. The same gap applies to
+   `ai-avatar-engine`, which also has no auth check yet.
 2. **No in-portal admin approval UI.** Reviewing and approving pending
    students is entirely console/CLI-based today.
 3. **Microsoft personal vs. organizational accounts** — see the
@@ -1287,6 +1715,38 @@ invocations for debugging.
     between the marking matrix and the prompt's worked example. Not
     built yet; would have caught the Case 27 incident before a student
     ever hit it.
+13. **AI Avatar Engine is proven for exactly one case, not scaled.**
+    The reuse-PALs-plus-`conversational_context` approach is planned
+    (see [AI Avatar Engine](#-ai-avatar-engine--tavus-integration-osce--scr))
+    but not built — today, every new case would mean hand-writing an
+    entire new PAL from scratch, which does not scale to 131 cases.
+14. **No "end conversation" Lambda.** Clicking "End session" in
+    `AvatarLiveSession.jsx` currently just closes the iframe and
+    returns to setup — it doesn't call Tavus to end the conversation
+    server-side, so conversations may keep running/billing after a
+    student navigates away.
+15. **No mapping from the 3 local persona keys to real Tavus `faceId`
+    values.** `PERSONA_FACE_MAP` currently maps all three
+    (`female`/`male`/`clinical`) to `null`, falling back to the PAL's
+    single `default_face_id` regardless of which the student picks —
+    the persona picker is currently cosmetic, not functional.
+16. **`TAVUS_API_KEY` is a plain environment variable**, not Secrets
+    Manager — a deliberate simpler-for-now choice, visible in plain
+    text to anyone with Lambda console/CLI read access. Worth moving
+    to Secrets Manager before this becomes anything student-facing.
+17. **No documents uploaded to Tavus's own Knowledge Base yet.** The
+    one live PAL relies entirely on facts hand-written into its
+    `system_prompt`, not on retrieval from an attached reference
+    document — see [AI Avatar Engine](#-ai-avatar-engine--tavus-integration-osce--scr).
+18. **The AI Avatar Engine has no scoring/report step at all.** Unlike
+    the recording-upload flow, a live avatar conversation today
+    produces no assessment, no report, no email — it's a practice
+    conversation only. Whether and how to score these (a transcript
+    capture + a Bedrock scoring call reusing the existing marking
+    matrices, most likely) is undecided and not started.
+19. **A dedicated Mock Exam simulation portal is a separate, not-yet-
+    started build.** This repo remains the admin-only testing ground
+    for both the offline-recording flow and the AI-avatar engine.
 
 ---
 
@@ -1311,5 +1771,14 @@ invocations for debugging.
 - Server-side token verification hardening
 - DTP station type
 
-**Phase 3 — Planned**
-- Live AI Study Buddy (voice-only roleplay patient, real-time loop)
+**Phase 3 — In progress (proof-of-concept stage)**
+- AI Avatar Engine added to this admin-only portal — one PAL, one
+  case (`case3-avulsed-tooth`), tone- and facial-expression-calibrated,
+  Lambda deployed and live end-to-end
+- Scaling the AI Avatar Engine to all 87 OSCE + 44 SCR cases via
+  reusable PALs + per-case `conversational_context` + tagged Tavus
+  documents — planned, not started
+- Scoring/report generation for avatar conversations — undecided, not
+  started
+- A separate, dedicated Mock Exam simulation portal — planned as its
+  own future build, not started
