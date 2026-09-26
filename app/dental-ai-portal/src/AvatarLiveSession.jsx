@@ -70,6 +70,7 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   // tests. Once confirmed working, delete this effect and uncomment
   // the startClockSequence() call inside handleJoined below instead.
   useEffect(() => {
+    console.log("[AvatarLiveSession] component mounted, starting clock sequence"); // TEMP
     startClockSequence();
     return () => clearAllTimersRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,7 +125,7 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   const clockColor =
     elapsedSeconds >= RED_AT_SECONDS ? theme.danger :
     elapsedSeconds >= AMBER_AT_SECONDS ? AMBER_COLOR :
-    theme.lime;
+    theme.ctaMint;
 
   return (
     <div style={styles.wrap}>
@@ -133,9 +134,9 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
           <span style={styles.liveDot} />
           Live · {caseLabel}
         </div>
-        {(clockPhase === "running" || clockPhase === "time-up") && (
+        {(clockPhase === "starting" || clockPhase === "running" || clockPhase === "time-up") && (
           <div style={{ ...styles.clockPill, background: `${clockColor}22`, color: clockColor, borderColor: clockColor }}>
-            {clockPhase === "time-up" ? "Time's up" : formatClock(remainingSeconds)}
+            {clockPhase === "starting" ? "Starting…" : clockPhase === "time-up" ? "Time's up" : formatClock(remainingSeconds)}
           </div>
         )}
       </div>
