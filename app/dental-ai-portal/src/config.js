@@ -20,18 +20,12 @@ export const STATION_TYPES = [
   { id: "AVATAR", label: "AI Avatar", enabled: true }
 ];
 
-// Sample case + patient-avatar catalog for the AI Avatar practice tab.
-// This is a standalone placeholder list for the admin-facing sample —
-// intentionally separate from CASE_CATALOG above, since the live-session
-// flow isn't wired into the OSCE/SCR/DTP recording pipeline yet.
+// Case catalog for the AI Avatar practice tab (admin-only). Kept
+// separate from CASE_CATALOG above since this isn't wired into the
+// OSCE/SCR/DTP recording pipeline. No persona/face picker — each
+// case's PAL uses its own default face.
 export const AVATAR_CASE_CATALOG = [
   { id: "case3-avulsed-tooth", label: "Case 3 — Avulsed tooth (telephone triage)" }
-];
-
-export const AVATAR_PERSONAS = [
-  { id: "female", label: "Female patient" },
-  { id: "male", label: "Male patient" },
-  { id: "clinical", label: "Clinical staff attire" }
 ];
 
 export const DEFAULT_STATION_TYPE = "OSCE";

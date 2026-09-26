@@ -12,32 +12,21 @@ const CASE_PAL_MAP = {
 };
 
 /**
- * Maps each local persona selection to a real Tavus faceId, once you've
- * created/chosen one per persona. Leaving a value as null means that
- * persona falls back to the PAL's own default_face_id for now.
- */
-const PERSONA_FACE_MAP = {
-  female: null,
-  male: null,
-  clinical: null
-};
-
-/**
- * Orchestrates the AI Avatar tab: setup screen -> real Tavus
- * conversation -> live call screen. This now makes a real backend
- * call on "Start session" (via create-tavus-conversation), rather
- * than showing a static sample.
+ * Orchestrates the AI Avatar tab: pick a case -> real Tavus
+ * conversation -> live call screen. No face/persona picker - every
+ * case uses its PAL's own default face. The review report always
+ * goes to the admin inbox (set server-side via ai-avatar-engine's
+ * ADMIN_REVIEW_EMAIL env var), never directly to whoever is testing,
+ * since the intent is admin review before sharing with the student.
  */
 export default function AvatarPractice() {
   const [step, setStep] = useState("setup"); // "setup" | "starting" | "live"
   const [caseId, setCaseId] = useState("");
-  const [personaId, setPersonaId] = useState("");
   const [conversationUrl, setConversationUrl] = useState(null);
   const [error, setError] = useState(null);
 
-  async function handleStart(selectedCaseId, selectedPersonaId) {
+  async function handleStart(selectedCaseId) {
     setCaseId(selectedCaseId);
-    setPersonaId(selectedPersonaId);
     setError(null);
 
     const palId = CASE_PAL_MAP[selectedCaseId];
@@ -50,7 +39,6 @@ export default function AvatarPractice() {
     try {
       const result = await requestAvatarConversation({
         palId,
-        faceId: PERSONA_FACE_MAP[selectedPersonaId] ?? undefined,
         caseId: selectedCaseId
       });
       setConversationUrl(result.conversationUrl);
@@ -70,7 +58,6 @@ export default function AvatarPractice() {
     return (
       <AvatarLiveSession
         caseId={caseId}
-        personaId={personaId}
         conversationUrl={conversationUrl}
         onEnd={handleEnd}
       />
