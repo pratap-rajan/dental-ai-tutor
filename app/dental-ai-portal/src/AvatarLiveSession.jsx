@@ -1,8 +1,54 @@
+import { useEffect, useRef } from "react";
+import Daily from "@daily-co/daily-js";
 import { AVATAR_CASE_CATALOG } from "./config.js";
 import { theme, fonts } from "./theme.js";
 
 export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
+  const iframeRef = useRef(null);
+  const callFrameRef = useRef(null);
+  const hasEndedRef = useRef(false); // guards against onEnd firing twice
+
   const caseLabel = AVATAR_CASE_CATALOG.find((c) => c.id === caseId)?.label ?? "Selected case";
+
+  useEffect(() => {
+    if (!iframeRef.current || !conversationUrl) return;
+
+    // Wrap our own iframe element rather than letting Daily create one,
+    // so we keep the layout/styling below - then join programmatically
+    // (not via the iframe's src attribute) so the wrapped instance is
+    // the one actually driving the call and can hear its events.
+    const callFrame = Daily.wrap(iframeRef.current);
+    callFrameRef.current = callFrame;
+    callFrame.join({ url: conversationUrl });
+
+    // Fires the moment the student leaves for ANY reason - Tavus/Daily's
+    // own in-call leave control, closing the tab, a dropped connection,
+    // or our own "End session" button below. This is what actually
+    // frees the Tavus conversation slot immediately, instead of relying
+    // on Tavus's own participant-left timeout.
+    function handleLeftOrError() {
+      if (hasEndedRef.current) return;
+      hasEndedRef.current = true;
+      onEnd();
+    }
+
+    callFrame.on("left-meeting", handleLeftOrError);
+    callFrame.on("error", handleLeftOrError);
+
+    return () => {
+      callFrame.off("left-meeting", handleLeftOrError);
+      callFrame.off("error", handleLeftOrError);
+      callFrame.destroy();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationUrl]);
+
+  function handleEndClick() {
+    // Triggers Daily's own "left-meeting" event, which calls onEnd via
+    // the listener above - handleEndClick itself doesn't call onEnd
+    // directly, so there's exactly one path that fires it either way.
+    callFrameRef.current?.leave();
+  }
 
   return (
     <div style={styles.wrap}>
@@ -15,15 +61,15 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
 
       <div style={styles.videoArea}>
         <iframe
+          ref={iframeRef}
           title="AI patient avatar call"
-          src={conversationUrl}
           allow="camera; microphone; autoplay; fullscreen; display-capture"
           style={styles.iframe}
         />
       </div>
 
       <div style={styles.controls}>
-        <button type="button" style={styles.endButton} onClick={onEnd}>
+        <button type="button" style={styles.endButton} onClick={handleEndClick}>
           <EndCallIcon />
           End session
         </button>
