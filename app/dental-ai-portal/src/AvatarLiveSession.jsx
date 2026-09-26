@@ -9,7 +9,8 @@ import { theme, fonts } from "./theme.js";
 const TOTAL_SESSION_SECONDS = 300; // 5 min, matching the real exam time
 const START_DELAY_SECONDS = 5;     // grace period before the clock starts
 const AMBER_AT_SECONDS = 240;      // 4:00 elapsed (1:00 remaining) - beep + amber
-const RED_AT_SECONDS = 280;        // 4:40 elapsed (0:20 remaining) - red
+const RED_AT_SECONDS = 280;        // 4:40 elapsed (0:20 remaining) - solid red
+const FLASH_AT_SECONDS = 290;      // 4:50 elapsed (0:10 remaining) - red + blinking
 const CLOSING_GRACE_SECONDS = 12;  // time allowed for closing remarks after the clock hits zero
 
 export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
@@ -31,8 +32,33 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   // "running" (clock ticking) -> "time-up" (closing-remarks window) -> ended
   const [clockPhase, setClockPhase] = useState("waiting");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [blinkOn, setBlinkOn] = useState(true);
+  const blinkIntervalRef = useRef(null);
 
   const caseLabel = AVATAR_CASE_CATALOG.find((c) => c.id === caseId)?.label ?? "Selected case";
+
+  const isFlashWindow = clockPhase === "running" && elapsedSeconds >= FLASH_AT_SECONDS;
+
+  // Blinks the pill only during the final 10 seconds (FLASH_AT_SECONDS
+  // to TOTAL_SESSION_SECONDS). A separate, faster interval from the
+  // main 1-second clock tick, since blinking needs a quicker toggle.
+  useEffect(() => {
+    if (isFlashWindow && !blinkIntervalRef.current) {
+      blinkIntervalRef.current = setInterval(() => {
+        setBlinkOn((prev) => !prev);
+      }, 450);
+    } else if (!isFlashWindow && blinkIntervalRef.current) {
+      clearInterval(blinkIntervalRef.current);
+      blinkIntervalRef.current = null;
+      setBlinkOn(true);
+    }
+    return () => {
+      if (blinkIntervalRef.current) {
+        clearInterval(blinkIntervalRef.current);
+        blinkIntervalRef.current = null;
+      }
+    };
+  }, [isFlashWindow]);
 
   function startClockSequence() {
     setClockPhase("starting");
@@ -135,7 +161,13 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
           Live · {caseLabel}
         </div>
         {(clockPhase === "starting" || clockPhase === "running" || clockPhase === "time-up") && (
-          <div style={{ ...styles.clockPill, background: `${clockColor}22`, color: clockColor, borderColor: clockColor }}>
+          <div style={{
+            ...styles.clockPill,
+            background: `${clockColor}22`,
+            color: clockColor,
+            borderColor: clockColor,
+            opacity: isFlashWindow && !blinkOn ? 0.3 : 1
+          }}>
             {clockPhase === "starting" ? "Starting…" : clockPhase === "time-up" ? "Time's up" : formatClock(remainingSeconds)}
           </div>
         )}
@@ -190,7 +222,7 @@ function playBeep() {
     oscillator.frequency.value = 880; // a simple, gentle tone - not an alarm
     gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
     oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.3);
+    oscillator.stop(ctx.currentTime + 0.6);
     oscillator.onended = () => ctx.close();
   } catch (err) {
     console.error("Could not play timer beep:", err);
