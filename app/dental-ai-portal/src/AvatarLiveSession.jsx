@@ -1,41 +1,91 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Daily from "@daily-co/daily-js";
 import { AVATAR_CASE_CATALOG } from "./config.js";
 import { theme, fonts } from "./theme.js";
 
+// Exam clock configuration for this station. Adjust here if a future
+// case needs a different time budget - these aren't wired to
+// per-case config yet (single-case setup, see AvatarPractice.jsx).
+const TOTAL_SESSION_SECONDS = 300; // 5 min, matching the real exam time
+const START_DELAY_SECONDS = 5;     // grace period after joining before the clock starts
+const AMBER_AT_SECONDS = 240;      // 4:00 elapsed (1:00 remaining) - beep + amber
+const RED_AT_SECONDS = 280;        // 4:40 elapsed (0:20 remaining) - red
+const CLOSING_GRACE_SECONDS = 12;  // time allowed for closing remarks after the clock hits zero
+
 export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   const iframeRef = useRef(null);
   const callFrameRef = useRef(null);
-  const hasEndedRef = useRef(false); // guards against onEnd firing twice
+  const hasEndedRef = useRef(false);   // guards against onEnd firing twice
+  const hasBeepedRef = useRef(false);  // guards against the beep firing more than once
+  const tickIntervalRef = useRef(null);
+  const startDelayTimeoutRef = useRef(null);
+  const closingTimeoutRef = useRef(null);
+
+  // "waiting" (call not joined yet) -> "starting" (5s grace period) ->
+  // "running" (clock ticking) -> "time-up" (closing-remarks window) -> ended
+  const [clockPhase, setClockPhase] = useState("waiting");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const caseLabel = AVATAR_CASE_CATALOG.find((c) => c.id === caseId)?.label ?? "Selected case";
 
   useEffect(() => {
     if (!iframeRef.current || !conversationUrl) return;
 
-    // Wrap our own iframe element rather than letting Daily create one,
-    // so we keep the layout/styling below - then join programmatically
-    // (not via the iframe's src attribute) so the wrapped instance is
-    // the one actually driving the call and can hear its events.
+    // Load the call the proven way (the iframe's own src loads Tavus's
+    // room directly) - Daily.wrap() is used only to listen for events
+    // on that same iframe, not to drive the join itself.
     const callFrame = Daily.wrap(iframeRef.current);
     callFrameRef.current = callFrame;
-    callFrame.join({ url: conversationUrl });
 
-    // Fires the moment the student leaves for ANY reason - Tavus/Daily's
-    // own in-call leave control, closing the tab, a dropped connection,
-    // or our own "End session" button below. This is what actually
-    // frees the Tavus conversation slot immediately, instead of relying
-    // on Tavus's own participant-left timeout.
+    function clearAllTimers() {
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+      if (startDelayTimeoutRef.current) clearTimeout(startDelayTimeoutRef.current);
+      if (closingTimeoutRef.current) clearTimeout(closingTimeoutRef.current);
+    }
+
+    function handleJoined() {
+      setClockPhase("starting");
+      startDelayTimeoutRef.current = setTimeout(() => {
+        setClockPhase("running");
+        tickIntervalRef.current = setInterval(() => {
+          setElapsedSeconds((prev) => {
+            const next = prev + 1;
+
+            if (next === AMBER_AT_SECONDS && !hasBeepedRef.current) {
+              hasBeepedRef.current = true;
+              playBeep();
+            }
+
+            if (next >= TOTAL_SESSION_SECONDS) {
+              clearInterval(tickIntervalRef.current);
+              setClockPhase("time-up");
+              closingTimeoutRef.current = setTimeout(() => {
+                if (hasEndedRef.current) return;
+                hasEndedRef.current = true;
+                onEnd();
+              }, CLOSING_GRACE_SECONDS * 1000);
+            }
+
+            return next;
+          });
+        }, 1000);
+      }, START_DELAY_SECONDS * 1000);
+    }
+
     function handleLeftOrError() {
       if (hasEndedRef.current) return;
       hasEndedRef.current = true;
+      clearAllTimers();
       onEnd();
     }
 
+    callFrame.on("joined-meeting", handleJoined);
     callFrame.on("left-meeting", handleLeftOrError);
     callFrame.on("error", handleLeftOrError);
 
     return () => {
+      clearAllTimers();
+      callFrame.off("joined-meeting", handleJoined);
       callFrame.off("left-meeting", handleLeftOrError);
       callFrame.off("error", handleLeftOrError);
       callFrame.destroy();
@@ -44,11 +94,14 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   }, [conversationUrl]);
 
   function handleEndClick() {
-    // Triggers Daily's own "left-meeting" event, which calls onEnd via
-    // the listener above - handleEndClick itself doesn't call onEnd
-    // directly, so there's exactly one path that fires it either way.
     callFrameRef.current?.leave();
   }
+
+  const remainingSeconds = Math.max(0, TOTAL_SESSION_SECONDS - elapsedSeconds);
+  const clockColor =
+    elapsedSeconds >= RED_AT_SECONDS ? theme.danger :
+    elapsedSeconds >= AMBER_AT_SECONDS ? AMBER_COLOR :
+    theme.lime;
 
   return (
     <div style={styles.wrap}>
@@ -57,16 +110,26 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
           <span style={styles.liveDot} />
           Live · {caseLabel}
         </div>
+        {(clockPhase === "running" || clockPhase === "time-up") && (
+          <div style={{ ...styles.clockPill, background: `${clockColor}22`, color: clockColor, borderColor: clockColor }}>
+            {clockPhase === "time-up" ? "Time's up" : formatClock(remainingSeconds)}
+          </div>
+        )}
       </div>
 
       <div style={styles.videoArea}>
         <iframe
           ref={iframeRef}
           title="AI patient avatar call"
+          src={conversationUrl}
           allow="camera; microphone; autoplay; fullscreen; display-capture"
           style={styles.iframe}
         />
       </div>
+
+      {clockPhase === "time-up" && (
+        <p style={styles.timeUpNote}>Give your closing remarks now — the session will end shortly.</p>
+      )}
 
       <div style={styles.controls}>
         <button type="button" style={styles.endButton} onClick={handleEndClick}>
@@ -81,6 +144,34 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
       </p>
     </div>
   );
+}
+
+// Not part of theme.js's design system (no amber token defined there) -
+// a literal choice for this one warning state.
+const AMBER_COLOR = "#f2b134";
+
+function formatClock(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function playBeep() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContextClass();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    oscillator.frequency.value = 880; // a simple, gentle tone - not an alarm
+    gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.3);
+    oscillator.onended = () => ctx.close();
+  } catch (err) {
+    console.error("Could not play timer beep:", err);
+  }
 }
 
 function EndCallIcon() {
@@ -108,6 +199,15 @@ const styles = {
     color: theme.white
   },
   liveDot: { width: 7, height: 7, borderRadius: "50%", background: theme.danger },
+  clockPill: {
+    fontFamily: fonts.mono,
+    fontSize: 14,
+    fontWeight: 600,
+    padding: "4px 12px",
+    borderRadius: 999,
+    border: "1.5px solid",
+    letterSpacing: 0.5
+  },
   videoArea: {
     position: "relative",
     borderRadius: 16,
@@ -122,6 +222,13 @@ const styles = {
     height: "100%",
     border: "none",
     display: "block"
+  },
+  timeUpNote: {
+    fontSize: 13,
+    color: theme.danger,
+    textAlign: "center",
+    fontWeight: 600,
+    marginBottom: 12
   },
   controls: {
     display: "flex",

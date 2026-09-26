@@ -19,6 +19,12 @@ CALLBACK_URL = os.environ.get("AVATAR_CALLBACK_URL")  # avatar-transcript-webhoo
 SESSIONS_TABLE_NAME = os.environ.get("AVATAR_SESSIONS_TABLE", "avatar-sessions")
 ADMIN_REVIEW_EMAIL = os.environ.get("ADMIN_REVIEW_EMAIL")
 ADMIN_REPORT_TYPE = os.environ.get("ADMIN_REPORT_TYPE", "detailed")
+# 900s (15 min) is a reasonable ceiling for case3-avulsed-tooth's telephone
+# triage - explicitly requested rather than relying on the account's
+# default, since a plan upgrade doesn't necessarily raise this
+# automatically. Will still be capped by whatever your Tavus plan's own
+# maximum conversation duration actually allows.
+MAX_CALL_DURATION_SECONDS = int(os.environ.get("MAX_CALL_DURATION_SECONDS", "900"))
 
 dynamodb = boto3.resource("dynamodb")
 sessions_table = dynamodb.Table(SESSIONS_TABLE_NAME)
@@ -65,7 +71,10 @@ def lambda_handler(event, context):
 
         tavus_payload = {
             "pal_id": pal_id,
-            "conversation_name": f"avatar-practice-{case_id}"
+            "conversation_name": f"avatar-practice-{case_id}",
+            "properties": {
+                "max_call_duration": MAX_CALL_DURATION_SECONDS
+            }
         }
         if face_id:
             tavus_payload["face_id"] = face_id
