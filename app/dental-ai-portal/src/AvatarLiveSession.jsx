@@ -7,7 +7,7 @@ import { theme, fonts } from "./theme.js";
 // case needs a different time budget - these aren't wired to
 // per-case config yet (single-case setup, see AvatarPractice.jsx).
 const TOTAL_SESSION_SECONDS = 300; // 5 min, matching the real exam time
-const START_DELAY_SECONDS = 5;     // grace period after joining before the clock starts
+const START_DELAY_SECONDS = 5;     // grace period before the clock starts
 const AMBER_AT_SECONDS = 240;      // 4:00 elapsed (1:00 remaining) - beep + amber
 const RED_AT_SECONDS = 280;        // 4:40 elapsed (0:20 remaining) - red
 const CLOSING_GRACE_SECONDS = 12;  // time allowed for closing remarks after the clock hits zero
@@ -21,75 +21,93 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   const startDelayTimeoutRef = useRef(null);
   const closingTimeoutRef = useRef(null);
 
-  // "waiting" (call not joined yet) -> "starting" (5s grace period) ->
+  const clearAllTimersRef = useRef(() => {
+    if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+    if (startDelayTimeoutRef.current) clearTimeout(startDelayTimeoutRef.current);
+    if (closingTimeoutRef.current) clearTimeout(closingTimeoutRef.current);
+  });
+
+  // "waiting" (not started yet) -> "starting" (5s grace period) ->
   // "running" (clock ticking) -> "time-up" (closing-remarks window) -> ended
   const [clockPhase, setClockPhase] = useState("waiting");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const caseLabel = AVATAR_CASE_CATALOG.find((c) => c.id === caseId)?.label ?? "Selected case";
 
+  function startClockSequence() {
+    setClockPhase("starting");
+    startDelayTimeoutRef.current = setTimeout(() => {
+      setClockPhase("running");
+      tickIntervalRef.current = setInterval(() => {
+        setElapsedSeconds((prev) => {
+          const next = prev + 1;
+
+          if (next === AMBER_AT_SECONDS && !hasBeepedRef.current) {
+            hasBeepedRef.current = true;
+            playBeep();
+          }
+
+          if (next >= TOTAL_SESSION_SECONDS) {
+            clearInterval(tickIntervalRef.current);
+            setClockPhase("time-up");
+            closingTimeoutRef.current = setTimeout(() => {
+              if (hasEndedRef.current) return;
+              hasEndedRef.current = true;
+              onEnd();
+            }, CLOSING_GRACE_SECONDS * 1000);
+          }
+
+          return next;
+        });
+      }, 1000);
+    }, START_DELAY_SECONDS * 1000);
+  }
+
+  // TEMPORARY: clock starts immediately when this screen mounts (i.e. as
+  // soon as "Start session" succeeds), instead of waiting for the real
+  // Tavus "joined-meeting" event - so the clock's behavior can be
+  // checked without spending conversation minutes on repeated live
+  // tests. Once confirmed working, delete this effect and uncomment
+  // the startClockSequence() call inside handleJoined below instead.
+  useEffect(() => {
+    startClockSequence();
+    return () => clearAllTimersRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!iframeRef.current || !conversationUrl) return;
 
-    // Wrap BEFORE the iframe has any src, then join programmatically -
-    // this guarantees our listeners are attached before the room loads,
-    // so "joined-meeting" can't fire before anything is listening for
-    // it. (An earlier version set src directly in JSX instead, which
-    // let the room start loading - and potentially already join -
-    // before this effect ran, causing "joined-meeting" to be missed
-    // entirely and the clock to never start.)
     const callFrame = Daily.wrap(iframeRef.current);
     callFrameRef.current = callFrame;
-    callFrame.join({ url: conversationUrl });
-
-    function clearAllTimers() {
-      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
-      if (startDelayTimeoutRef.current) clearTimeout(startDelayTimeoutRef.current);
-      if (closingTimeoutRef.current) clearTimeout(closingTimeoutRef.current);
-    }
 
     function handleJoined() {
-      setClockPhase("starting");
-      startDelayTimeoutRef.current = setTimeout(() => {
-        setClockPhase("running");
-        tickIntervalRef.current = setInterval(() => {
-          setElapsedSeconds((prev) => {
-            const next = prev + 1;
-
-            if (next === AMBER_AT_SECONDS && !hasBeepedRef.current) {
-              hasBeepedRef.current = true;
-              playBeep();
-            }
-
-            if (next >= TOTAL_SESSION_SECONDS) {
-              clearInterval(tickIntervalRef.current);
-              setClockPhase("time-up");
-              closingTimeoutRef.current = setTimeout(() => {
-                if (hasEndedRef.current) return;
-                hasEndedRef.current = true;
-                onEnd();
-              }, CLOSING_GRACE_SECONDS * 1000);
-            }
-
-            return next;
-          });
-        }, 1000);
-      }, START_DELAY_SECONDS * 1000);
+      console.log("[AvatarLiveSession] joined-meeting fired"); // TEMP - remove once confirmed working
+      // Once the mount-triggered effect above is removed, restore the
+      // real trigger here:
+      // startClockSequence();
     }
 
-    function handleLeftOrError() {
+    function handleLeftOrError(event) {
+      console.log("[AvatarLiveSession] left-meeting or error fired", event); // TEMP
       if (hasEndedRef.current) return;
       hasEndedRef.current = true;
-      clearAllTimers();
+      clearAllTimersRef.current();
       onEnd();
     }
 
+    // Listeners attached BEFORE join() is called, not after.
     callFrame.on("joined-meeting", handleJoined);
     callFrame.on("left-meeting", handleLeftOrError);
     callFrame.on("error", handleLeftOrError);
 
+    console.log("[AvatarLiveSession] calling join()", conversationUrl); // TEMP
+    callFrame.join({ url: conversationUrl }).then(
+      () => console.log("[AvatarLiveSession] join() promise resolved"), // TEMP
+      (err) => console.log("[AvatarLiveSession] join() promise rejected", err) // TEMP
+    );
+
     return () => {
-      clearAllTimers();
       callFrame.off("joined-meeting", handleJoined);
       callFrame.off("left-meeting", handleLeftOrError);
       callFrame.off("error", handleLeftOrError);
