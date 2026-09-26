@@ -1,7 +1,7 @@
 import { useState } from "react";
 import AvatarSetup from "./AvatarSetup.jsx";
 import AvatarLiveSession from "./AvatarLiveSession.jsx";
-import { requestAvatarConversation } from "./api.js";
+import { requestAvatarConversation, endAvatarSession } from "./api.js";
 
 /**
  * Maps each sample case to its Tavus PAL. Extend this as more cases
@@ -23,6 +23,7 @@ export default function AvatarPractice() {
   const [step, setStep] = useState("setup"); // "setup" | "starting" | "live"
   const [caseId, setCaseId] = useState("");
   const [conversationUrl, setConversationUrl] = useState(null);
+  const [conversationId, setConversationId] = useState(null);
   const [error, setError] = useState(null);
 
   async function handleStart(selectedCaseId) {
@@ -42,6 +43,7 @@ export default function AvatarPractice() {
         caseId: selectedCaseId
       });
       setConversationUrl(result.conversationUrl);
+      setConversationId(result.conversationId);
       setStep("live");
     } catch (err) {
       setError(err.message || "Could not start the session.");
@@ -49,8 +51,19 @@ export default function AvatarPractice() {
     }
   }
 
-  function handleEnd() {
+  async function handleEnd() {
+    // Best-effort: tell Tavus the call is over so it doesn't linger
+    // as "active" and eat into the concurrent-conversation limit.
+    // The UI moves on regardless of whether this call succeeds.
+    if (conversationId) {
+      try {
+        await endAvatarSession({ conversationId });
+      } catch (err) {
+        console.error("Failed to end avatar session server-side:", err);
+      }
+    }
     setConversationUrl(null);
+    setConversationId(null);
     setStep("setup");
   }
 

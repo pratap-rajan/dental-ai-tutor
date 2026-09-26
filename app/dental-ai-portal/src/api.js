@@ -126,3 +126,23 @@ export async function requestAvatarConversation({ palId, faceId, caseId }) {
 
   return response.json();
 }
+
+/**
+ * Tells the backend to end a live Tavus conversation server-side, so
+ * it stops counting against the concurrent-conversation limit instead
+ * of lingering as "active" after the student leaves the call.
+ */
+export async function endAvatarSession({ conversationId }) {
+  const response = await fetch(`${API_BASE_URL}/end-avatar-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId })
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Could not end the avatar session (${response.status}). ${text}`.trim());
+  }
+
+  return response.json();
+}
