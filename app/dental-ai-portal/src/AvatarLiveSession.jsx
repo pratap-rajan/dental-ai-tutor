@@ -31,11 +31,16 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   useEffect(() => {
     if (!iframeRef.current || !conversationUrl) return;
 
-    // Load the call the proven way (the iframe's own src loads Tavus's
-    // room directly) - Daily.wrap() is used only to listen for events
-    // on that same iframe, not to drive the join itself.
+    // Wrap BEFORE the iframe has any src, then join programmatically -
+    // this guarantees our listeners are attached before the room loads,
+    // so "joined-meeting" can't fire before anything is listening for
+    // it. (An earlier version set src directly in JSX instead, which
+    // let the room start loading - and potentially already join -
+    // before this effect ran, causing "joined-meeting" to be missed
+    // entirely and the clock to never start.)
     const callFrame = Daily.wrap(iframeRef.current);
     callFrameRef.current = callFrame;
+    callFrame.join({ url: conversationUrl });
 
     function clearAllTimers() {
       if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
@@ -121,7 +126,6 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
         <iframe
           ref={iframeRef}
           title="AI patient avatar call"
-          src={conversationUrl}
           allow="camera; microphone; autoplay; fullscreen; display-capture"
           style={styles.iframe}
         />
