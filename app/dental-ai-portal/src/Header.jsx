@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { theme, fonts } from "./theme.js";
+import ThemeToggle from "./themetoggle.jsx";
 
 export default function Header({ onCtaClick, studentName, onSignOut, onShowReports }) {
   const [signOutHovered, setSignOutHovered] = useState(false);
@@ -23,7 +24,7 @@ export default function Header({ onCtaClick, studentName, onSignOut, onShowRepor
                   borderColor: reportsHovered ? theme.tealGlow : theme.navyLighter,
                   color: reportsHovered ? theme.tealGlow : theme.mint,
                   background: reportsHovered ? "rgba(99,209,230,0.14)" : "transparent",
-                  boxShadow: reportsHovered ? `0 0 18px -4px ${theme.tealGlow}99` : "none"
+                  boxShadow: reportsHovered ? `0 0 18px -4px color-mix(in srgb, ${theme.tealGlow} 60%, transparent)` : "none"
                 }}
                 onMouseEnter={() => setReportsHovered(true)}
                 onMouseLeave={() => setReportsHovered(false)}
@@ -34,10 +35,10 @@ export default function Header({ onCtaClick, studentName, onSignOut, onShowRepor
               <button
                 style={{
                   ...styles.signOutButton,
-                  borderColor: signOutHovered ? theme.tealGlow : theme.tealGlow + "88",
+                  borderColor: signOutHovered ? theme.tealGlow : `color-mix(in srgb, ${theme.tealGlow} 53%, transparent)`,
                   color: theme.tealGlow,
                   background: signOutHovered ? "rgba(99,209,230,0.14)" : "rgba(99,209,230,0.06)",
-                  boxShadow: signOutHovered ? `0 0 18px -4px ${theme.tealGlow}99` : "none"
+                  boxShadow: signOutHovered ? `0 0 18px -4px color-mix(in srgb, ${theme.tealGlow} 60%, transparent)` : "none"
                 }}
                 onMouseEnter={() => setSignOutHovered(true)}
                 onMouseLeave={() => setSignOutHovered(false)}
@@ -47,6 +48,7 @@ export default function Header({ onCtaClick, studentName, onSignOut, onShowRepor
               </button>
             </div>
           )}
+          <ThemeToggle />
           <button style={styles.cta} onClick={onCtaClick}>
             Try it now
           </button>

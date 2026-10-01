@@ -150,7 +150,7 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
             borderColor: cardHovered || submitting ? cardAccent : theme.navyLighter,
             boxShadow:
               cardHovered || submitting
-                ? `0 0 0 1px ${cardAccent}44, 0 0 60px -10px ${cardAccent}88, 0 16px 40px rgba(0,0,0,0.4)`
+                ? `0 0 0 1px color-mix(in srgb, ${cardAccent} 27%, transparent), 0 0 60px -10px color-mix(in srgb, ${cardAccent} 53%, transparent), 0 16px 40px rgba(0,0,0,0.4)`
                 : "0 4px 20px rgba(0,0,0,0.25)"
           }}
           onMouseEnter={() => setCardHovered(true)}
@@ -159,7 +159,7 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
           <div
             style={{
               ...styles.backlight,
-              background: `radial-gradient(circle at 25% 15%, ${cardAccent}2e, transparent 60%)`,
+              background: `radial-gradient(circle at 25% 15%, color-mix(in srgb, ${cardAccent} 18%, transparent), transparent 60%)`,
               opacity: cardHovered || submitting ? 1 : 0
             }}
           />
@@ -406,7 +406,7 @@ const styles = {
     background: "rgba(114,212,196,0.10)",
     border: `1.5px solid ${theme.ctaMint}`,
     color: theme.ctaMint,
-    boxShadow: `0 0 20px -6px ${theme.ctaMint}99`
+    boxShadow: `0 0 20px -6px color-mix(in srgb, ${theme.ctaMint} 60%, transparent)`
   },
   stationTabDisabled: {
     color: theme.slateLight,
@@ -497,7 +497,7 @@ const styles = {
     height: "100%",
     borderRadius: 5,
     background: `linear-gradient(90deg, ${theme.heroGradientStart}, ${theme.heroGradientEnd})`,
-    boxShadow: `0 0 12px ${theme.tealGlow}99`,
+    boxShadow: `0 0 12px color-mix(in srgb, ${theme.tealGlow} 60%, transparent)`,
     transition: "width 0.2s ease"
   },
   progressLabel: {

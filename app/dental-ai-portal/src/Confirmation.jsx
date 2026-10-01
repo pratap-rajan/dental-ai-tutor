@@ -145,8 +145,8 @@ const styles = {
     margin: "0 auto",
     background: "#0d1021",
     borderRadius: 16,
-    border: `1px solid ${theme.ctaMint}55`,
-    boxShadow: `0 0 0 1px ${theme.ctaMint}22, 0 0 60px -10px ${theme.tealGlow}66, 0 16px 40px rgba(0,0,0,0.4)`,
+    border: `1px solid color-mix(in srgb, ${theme.ctaMint} 33%, transparent)`,
+    boxShadow: `0 0 0 1px color-mix(in srgb, ${theme.ctaMint} 13%, transparent), 0 0 60px -10px color-mix(in srgb, ${theme.tealGlow} 40%, transparent), 0 16px 40px rgba(0,0,0,0.4)`,
     padding: "2rem",
     textAlign: "center"
   },
@@ -154,7 +154,7 @@ const styles = {
     position: "absolute",
     inset: 0,
     pointerEvents: "none",
-    background: `radial-gradient(circle at 30% 10%, ${theme.tealGlow}22, transparent 60%)`
+    background: `radial-gradient(circle at 30% 10%, color-mix(in srgb, ${theme.tealGlow} 13%, transparent), transparent 60%)`
   },
   iconCircle: {
     position: "relative",
@@ -187,7 +187,7 @@ const styles = {
     fontSize: 13,
     color: theme.accentPurple,
     background: "rgba(162,143,243,0.08)",
-    border: `1px solid ${theme.accentPurple}44`,
+    border: `1px solid color-mix(in srgb, ${theme.accentPurple} 27%, transparent)`,
     borderRadius: 8,
     padding: "10px 14px",
     margin: "0 0 1rem",

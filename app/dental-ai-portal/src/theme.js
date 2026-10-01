@@ -1,37 +1,38 @@
 // Base identity colors extracted directly from the Plan Ore logo.
-// Accent/interactive colors (heroGradientStart/End, accentPurple,
-// pageBg) are a deep-navy + teal-to-cyan gradient + soft purple
-// system, in the spirit of modern dark SaaS product sites, tuned to
-// coordinate with the logo's existing teal rather than clash with it.
+// Every value below is a CSS custom property reference, not a literal
+// hex - see ThemeContext.jsx for the actual light/dark hex values and
+// the mode-toggle logic. Every component keeps importing `theme`
+// exactly as before; switching light/dark just updates what these
+// variables resolve to, so no consuming file needs any structural
+// change for the toggle to work.
 export const theme = {
-  navy: "#293039",         // deep background (logo)
-  navyLight: "#333c47",    // card / raised surface on navy
-  navyLighter: "#3d4650",  // hover / border on navy
-  mint: "#c3edef",         // soft mint text / accents (logo)
-  teal: "#00c2cb",         // bright teal — primary accent (logo)
-  tealDark: "#009aa1",     // teal hover state
+  navy: "var(--po-navy)",
+  navyLight: "var(--po-navy-light)",
+  navyLighter: "var(--po-navy-lighter)",
+  mint: "var(--po-mint)",
+  teal: "var(--po-teal)",
+  tealDark: "var(--po-teal-dark)",
 
-  // Deep hero background + gradient accent system
-  pageBg: "#04070f",         // near-black navy, deepest background tone
-  pageBgLight: "#151726",    // slightly raised panel on pageBg
-  purpleWash: "#181335",     // saturated purple wash for background gradients
-  purpleGlow: "#a28ff3",     // bright purple glow accent
-  tealGlow: "#63d1e6",       // bright teal-cyan glow accent
-  heroGradientStart: "#5fd0c4", // teal end of the headline gradient
-  heroGradientEnd: "#63c9ec",   // cyan-blue end of the headline gradient
-  accentPurple: "#a28ff3",      // soft lavender-purple, secondary accent
-  ctaMint: "#72d4c4",           // bright mint CTA button fill
-  lime: "#d4e157",              // needs-attention / pending-state accent
+  pageBg: "var(--po-page-bg)",
+  pageBgLight: "var(--po-page-bg-light)",
+  purpleWash: "var(--po-purple-wash)",
+  purpleGlow: "var(--po-purple-glow)",
+  tealGlow: "var(--po-teal-glow)",
+  heroGradientStart: "var(--po-hero-gradient-start)",
+  heroGradientEnd: "var(--po-hero-gradient-end)",
+  accentPurple: "var(--po-accent-purple)",
+  ctaMint: "var(--po-cta-mint)",
+  lime: "var(--po-lime)",
 
-  white: "#ffffff",
-  ink: "#0f172a",
-  slate: "#64748b",
-  slateLight: "#94a3b8",
-  border: "#e2e8f0",
-  surface: "#f8fafc",
-  success: "#16a34a",
-  successBg: "#dcfce7",
-  danger: "#dc2626"
+  white: "var(--po-white)",
+  ink: "var(--po-ink)",
+  slate: "var(--po-slate)",
+  slateLight: "var(--po-slate-light)",
+  border: "var(--po-border)",
+  surface: "var(--po-surface)",
+  success: "var(--po-success)",
+  successBg: "var(--po-success-bg)",
+  danger: "var(--po-danger)"
 };
 
 export const fonts = {

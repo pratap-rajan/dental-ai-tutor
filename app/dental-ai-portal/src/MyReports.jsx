@@ -97,7 +97,7 @@ const styles = {
   },
   backButton: {
     background: "transparent",
-    border: `1px solid ${theme.tealGlow}88`,
+    border: `1px solid color-mix(in srgb, ${theme.tealGlow} 53%, transparent)`,
     color: theme.tealGlow,
     borderRadius: 6,
     padding: "6px 14px",

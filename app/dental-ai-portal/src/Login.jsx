@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { theme, fonts } from "./theme.js";
 import { buildAuthorizeUrl } from "./authConfig.js";
 import { preparePkceChallenge } from "./AuthContext.jsx";
+import ThemeToggle from "./themetoggle.jsx";
 
 export default function Login({ pendingApproval, authError, errorDetail }) {
   const [tcAccepted, setTcAccepted] = useState(false);
@@ -52,6 +53,7 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
   if (pendingApproval) {
     return (
       <div style={styles.page}>
+        <div style={styles.toggleCorner}><ThemeToggle /></div>
         <div style={styles.centerWrap}>
           <Brand />
           <div style={{ ...styles.card, borderColor: "rgba(99,209,230,0.4)", boxShadow: "0 0 60px -12px rgba(99,209,230,0.35)" }}>
@@ -71,6 +73,7 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
 
   return (
     <div style={styles.page}>
+      <div style={styles.toggleCorner}><ThemeToggle /></div>
       <div style={styles.layoutRow}>
         <div style={styles.centerWrap}>
           <Brand />
@@ -80,7 +83,7 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
               ...styles.card,
               borderColor: cardHovered ? cardAccent : theme.navyLighter,
               boxShadow: cardHovered
-                ? `0 0 0 1px ${cardAccent}44, 0 0 60px -10px ${cardAccent}99, 0 16px 40px rgba(0,0,0,0.4)`
+                ? `0 0 0 1px color-mix(in srgb, ${cardAccent} 27%, transparent), 0 0 60px -10px color-mix(in srgb, ${cardAccent} 60%, transparent), 0 16px 40px rgba(0,0,0,0.4)`
                 : "0 0 60px -14px rgba(162,143,243,0.28)"
             }}
             onMouseEnter={() => setCardHovered(true)}
@@ -89,7 +92,7 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
             <div
               style={{
                 ...styles.cardBacklight,
-                background: `radial-gradient(circle at 30% 10%, ${cardAccent}2e, transparent 65%)`,
+                background: `radial-gradient(circle at 30% 10%, color-mix(in srgb, ${cardAccent} 18%, transparent), transparent 65%)`,
                 opacity: cardHovered ? 1 : 0
               }}
             />
@@ -139,7 +142,7 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
                   border: `1px solid ${msHovered && tcAccepted ? theme.tealGlow : theme.navyLighter}`,
                   opacity: tcAccepted ? 1 : 0.5,
                   cursor: tcAccepted ? "pointer" : "not-allowed",
-                  boxShadow: msHovered && tcAccepted ? `0 0 24px -6px ${theme.tealGlow}88` : "none",
+                  boxShadow: msHovered && tcAccepted ? `0 0 24px -6px color-mix(in srgb, ${theme.tealGlow} 53%, transparent)` : "none",
                   transform: msHovered && tcAccepted ? "translateY(-1px)" : "translateY(0)"
                 }}
                 onClick={() => handleProvider("Microsoft")}
@@ -200,7 +203,7 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
                 style={{
                   ...styles.tcTile,
                   borderColor: tcTileHovered || tcPanelOpen ? theme.purpleGlow : theme.navyLighter,
-                  boxShadow: tcTileHovered ? `0 0 24px -8px ${theme.purpleGlow}99` : "none"
+                  boxShadow: tcTileHovered ? `0 0 24px -8px color-mix(in srgb, ${theme.purpleGlow} 60%, transparent)` : "none"
                 }}
                 onClick={() => setTcPanelOpen((v) => !v)}
                 onMouseEnter={() => setTcTileHovered(true)}
@@ -326,6 +329,12 @@ function MicrosoftIcon() {
 }
 
 const styles = {
+  toggleCorner: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    zIndex: 5
+  },
   page: {
     minHeight: "100vh",
     background: [

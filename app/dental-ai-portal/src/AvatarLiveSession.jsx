@@ -163,7 +163,7 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
         {(clockPhase === "starting" || clockPhase === "running" || clockPhase === "time-up") && (
           <div style={{
             ...styles.clockPill,
-            background: `${clockColor}22`,
+            background: `color-mix(in srgb, ${clockColor} 13%, transparent)`,
             color: clockColor,
             borderColor: clockColor,
             opacity: isFlashWindow && !blinkOn ? 0.3 : 1
