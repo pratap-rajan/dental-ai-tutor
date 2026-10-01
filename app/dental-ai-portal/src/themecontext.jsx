@@ -38,18 +38,24 @@ const DARK_VALUES = {
   "--po-danger": "#dc2626"
 };
 
+// Neutrals/text/borders use Google's standard Material surface
+// palette (the same grays behind Gmail/Search/Docs). Brand accents
+// (teal, ctaMint, purpleGlow, lime) are left untouched - see note in
+// chat if you want those swapped to Google's 4-color brand palette
+// (#4285F4/#EA4335/#FBBC05/#34A853) too, which would affect dark mode
+// as well since accents stay identical across both modes.
 const LIGHT_VALUES = {
   "--po-navy": "#ffffff",
-  "--po-navy-light": "#f3f5f7",
-  "--po-navy-lighter": "#dde3e8",
-  "--po-mint": "#3d6b70",
+  "--po-navy-light": "#f1f3f4",
+  "--po-navy-lighter": "#dadce0",
+  "--po-mint": "#5f6368",
   "--po-teal": "#00c2cb",
   "--po-teal-dark": "#009aa1",
 
-  "--po-page-bg": "#f7f9fb",
+  "--po-page-bg": "#f8f9fa",
   "--po-page-bg-light": "#ffffff",
-  "--po-page-bg-deep-1": "#eee9fb",
-  "--po-page-bg-deep-2": "#eaf2f7",
+  "--po-page-bg-deep-1": "#f1f3f4",
+  "--po-page-bg-deep-2": "#f8f9fa",
   "--po-purple-wash": "#f1edfd",
   "--po-purple-glow": "#a28ff3",
   "--po-teal-glow": "#63d1e6",
@@ -60,15 +66,15 @@ const LIGHT_VALUES = {
   "--po-lime": "#d4e157",
   "--po-card-bg": "#ffffff",
 
-  "--po-white": "#12151c",
-  "--po-ink": "#0f172a",
-  "--po-slate": "#64748b",
-  "--po-slate-light": "#5b6472",
-  "--po-border": "#e2e8f0",
-  "--po-surface": "#f8fafc",
-  "--po-success": "#16a34a",
-  "--po-success-bg": "#dcfce7",
-  "--po-danger": "#dc2626"
+  "--po-white": "#202124",
+  "--po-ink": "#202124",
+  "--po-slate": "#5f6368",
+  "--po-slate-light": "#5f6368",
+  "--po-border": "#dadce0",
+  "--po-surface": "#f8f9fa",
+  "--po-success": "#34a853",
+  "--po-success-bg": "#e6f4ea",
+  "--po-danger": "#ea4335"
 };
 
 const STORAGE_KEY = "planore-theme-mode";
