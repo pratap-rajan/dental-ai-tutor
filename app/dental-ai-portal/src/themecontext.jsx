@@ -15,6 +15,8 @@ const DARK_VALUES = {
 
   "--po-page-bg": "#04070f",
   "--po-page-bg-light": "#151726",
+  "--po-page-bg-deep-1": "#0a0620",
+  "--po-page-bg-deep-2": "#060a16",
   "--po-purple-wash": "#181335",
   "--po-purple-glow": "#a28ff3",
   "--po-teal-glow": "#63d1e6",
@@ -23,6 +25,7 @@ const DARK_VALUES = {
   "--po-accent-purple": "#a28ff3",
   "--po-cta-mint": "#72d4c4",
   "--po-lime": "#d4e157",
+  "--po-card-bg": "#0d1021",
 
   "--po-white": "#ffffff",
   "--po-ink": "#0f172a",
@@ -45,6 +48,8 @@ const LIGHT_VALUES = {
 
   "--po-page-bg": "#f7f9fb",
   "--po-page-bg-light": "#ffffff",
+  "--po-page-bg-deep-1": "#eee9fb",
+  "--po-page-bg-deep-2": "#eaf2f7",
   "--po-purple-wash": "#f1edfd",
   "--po-purple-glow": "#a28ff3",
   "--po-teal-glow": "#63d1e6",
@@ -53,6 +58,7 @@ const LIGHT_VALUES = {
   "--po-accent-purple": "#a28ff3",
   "--po-cta-mint": "#72d4c4",
   "--po-lime": "#d4e157",
+  "--po-card-bg": "#ffffff",
 
   "--po-white": "#12151c",
   "--po-ink": "#0f172a",

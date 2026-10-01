@@ -216,7 +216,7 @@ const styles = {
     right: 0,
     maxHeight: 260,
     overflowY: "auto",
-    background: "#0d1021",
+    background: theme.cardBg,
     border: `1px solid ${theme.navyLighter}`,
     borderRadius: 10,
     boxShadow: "0 12px 32px rgba(0,0,0,0.5)",

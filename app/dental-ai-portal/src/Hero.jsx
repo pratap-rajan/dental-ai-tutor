@@ -68,7 +68,7 @@ const styles = {
       `radial-gradient(ellipse 900px 500px at 22% 10%, rgba(162,143,243,0.32), transparent 60%)`,
       `radial-gradient(ellipse 700px 500px at 78% 78%, rgba(99,209,230,0.28), transparent 55%)`,
       `radial-gradient(ellipse 600px 450px at 15% 85%, rgba(162,143,243,0.22), transparent 55%)`,
-      `linear-gradient(180deg, ${theme.pageBg} 0%, #0a0620 35%, #060a16 70%, ${theme.pageBg} 100%)`
+      `linear-gradient(180deg, ${theme.pageBg} 0%, ${theme.pageBgDeep1} 35%, ${theme.pageBgDeep2} 70%, ${theme.pageBg} 100%)`
     ].join(", "),
     padding: "3.5rem 1.5rem 4rem",
     fontFamily: fonts.body

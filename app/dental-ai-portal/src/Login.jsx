@@ -138,7 +138,7 @@ export default function Login({ pendingApproval, authError, errorDetail }) {
                 style={{
                   ...styles.providerButton,
                   background: theme.navyLighter,
-                  color: "#fff",
+                  color: theme.white,
                   border: `1px solid ${msHovered && tcAccepted ? theme.tealGlow : theme.navyLighter}`,
                   opacity: tcAccepted ? 1 : 0.5,
                   cursor: tcAccepted ? "pointer" : "not-allowed",
@@ -340,7 +340,7 @@ const styles = {
     background: [
       `radial-gradient(ellipse 900px 500px at 22% 10%, rgba(162,143,243,0.24), transparent 60%)`,
       `radial-gradient(ellipse 700px 500px at 78% 78%, rgba(99,209,230,0.20), transparent 55%)`,
-      `linear-gradient(180deg, ${theme.pageBg} 0%, #0a0620 35%, #060a16 70%, ${theme.pageBg} 100%)`
+      `linear-gradient(180deg, ${theme.pageBg} 0%, ${theme.pageBgDeep1} 35%, ${theme.pageBgDeep2} 70%, ${theme.pageBg} 100%)`
     ].join(", "),
     display: "flex",
     alignItems: "center",
@@ -372,7 +372,7 @@ const styles = {
   card: {
     position: "relative",
     width: "100%",
-    background: "rgba(13,16,33,0.9)",
+    background: `color-mix(in srgb, ${theme.cardBg} 90%, transparent)`,
     backdropFilter: "blur(6px)",
     border: `1px solid ${theme.navyLighter}`,
     borderRadius: 16,
@@ -388,7 +388,7 @@ const styles = {
     display: "flex", alignItems: "center", justifyContent: "center",
     margin: "0 auto 14px"
   },
-  title: { color: "#fff", fontSize: 20, fontWeight: 500, margin: "0 0 4px", textAlign: "center" },
+  title: { color: theme.white, fontSize: 20, fontWeight: 500, margin: "0 0 4px", textAlign: "center" },
   subtitle: { color: theme.slateLight, fontSize: 13, margin: "0 0 20px", textAlign: "center", lineHeight: 1.6 },
   errorBox: {
     display: "flex", alignItems: "center", gap: 8,
@@ -419,7 +419,7 @@ const styles = {
 
   tcTile: {
     width: "100%", display: "flex", alignItems: "center", gap: 10,
-    padding: "11px 12px", background: "#11162a", border: "1px solid",
+    padding: "11px 12px", background: theme.navyLight, border: "1px solid",
     borderRadius: 8, cursor: "pointer", textAlign: "left", boxSizing: "border-box",
     transition: "border-color 0.2s ease, box-shadow 0.2s ease"
   },
@@ -428,7 +428,7 @@ const styles = {
     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
   },
   tcTileContent: { flex: 1, minWidth: 0 },
-  tcTileTitle: { color: "#fff", fontSize: 12, fontWeight: 500, marginBottom: 2 },
+  tcTileTitle: { color: theme.white, fontSize: 12, fontWeight: 500, marginBottom: 2 },
   tcTileSubtitle: { color: "#6b7280", fontSize: 10.5 },
   acceptedBadge: {
     display: "flex", alignItems: "center", gap: 4,
@@ -445,7 +445,7 @@ const styles = {
     position: "relative",
     width: "100%",
     maxWidth: 360,
-    background: "rgba(13,16,33,0.92)",
+    background: `color-mix(in srgb, ${theme.cardBg} 92%, transparent)`,
     backdropFilter: "blur(6px)",
     border: `1px solid ${theme.navyLighter}`,
     borderRadius: 16,
@@ -466,7 +466,7 @@ const styles = {
     display: "flex", alignItems: "center", gap: 10,
     padding: "18px 44px 14px 18px", borderBottom: `1px solid ${theme.navyLighter}`, flexShrink: 0
   },
-  tcPanelHeaderTitle: { color: "#fff", fontSize: 14, fontWeight: 500, margin: 0 },
+  tcPanelHeaderTitle: { color: theme.white, fontSize: 14, fontWeight: 500, margin: 0 },
   tcPanelBody: { flex: 1, overflowY: "auto", padding: "16px 18px" },
   tcPanelFooter: { padding: "12px 18px", borderTop: `1px solid ${theme.navyLighter}`, flexShrink: 0 },
   tcAgreeButton: {

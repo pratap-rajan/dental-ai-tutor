@@ -8,6 +8,7 @@ import Footer from "./Footer.jsx";
 import Login from "./Login.jsx";
 import MyReports from "./MyReports.jsx";
 import { useAuth } from "./AuthContext.jsx";
+import { theme } from "./theme.js";
 
 const STORAGE_KEY = "planore_pending_submission";
 const COOLDOWN_MS = 90000; // matches Confirmation.jsx's "settle" timer
@@ -57,7 +58,7 @@ export default function App() {
   // Still checking for a stored/callback session on first load.
   if (status === "loading") {
     return (
-      <div style={{ background: "#04070f", minHeight: "100vh" }} />
+      <div style={{ background: theme.pageBg, minHeight: "100vh" }} />
     );
   }
 
@@ -77,7 +78,7 @@ export default function App() {
 
   if (showReports) {
     return (
-      <div style={{ background: "#04070f", minHeight: "100vh" }}>
+      <div style={{ background: theme.pageBg, minHeight: "100vh" }}>
         <Header
           onCtaClick={scrollToForm}
           studentName={name}
@@ -91,7 +92,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ background: "#04070f" }}>
+    <div style={{ background: theme.pageBg }}>
       <Header
         onCtaClick={scrollToForm}
         studentName={name}

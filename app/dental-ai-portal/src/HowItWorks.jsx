@@ -137,7 +137,7 @@ const styles = {
   stepCard: {
     position: "relative",
     overflow: "hidden",
-    background: "#0d1021",
+    background: theme.cardBg,
     border: "1px solid",
     borderRadius: 16,
     padding: "1.75rem 1.75rem 1.5rem",

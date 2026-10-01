@@ -15,6 +15,8 @@ export const theme = {
 
   pageBg: "var(--po-page-bg)",
   pageBgLight: "var(--po-page-bg-light)",
+  pageBgDeep1: "var(--po-page-bg-deep-1)",
+  pageBgDeep2: "var(--po-page-bg-deep-2)",
   purpleWash: "var(--po-purple-wash)",
   purpleGlow: "var(--po-purple-glow)",
   tealGlow: "var(--po-teal-glow)",
@@ -23,6 +25,7 @@ export const theme = {
   accentPurple: "var(--po-accent-purple)",
   ctaMint: "var(--po-cta-mint)",
   lime: "var(--po-lime)",
+  cardBg: "var(--po-card-bg)",
 
   white: "var(--po-white)",
   ink: "var(--po-ink)",

@@ -143,7 +143,7 @@ const styles = {
     overflow: "hidden",
     maxWidth: 480,
     margin: "0 auto",
-    background: "#0d1021",
+    background: theme.cardBg,
     borderRadius: 16,
     border: `1px solid color-mix(in srgb, ${theme.ctaMint} 33%, transparent)`,
     boxShadow: `0 0 0 1px color-mix(in srgb, ${theme.ctaMint} 13%, transparent), 0 0 60px -10px color-mix(in srgb, ${theme.tealGlow} 40%, transparent), 0 16px 40px rgba(0,0,0,0.4)`,

@@ -364,7 +364,7 @@ const styles = {
     position: "relative",
     overflow: "hidden",
     textAlign: "left",
-    background: "#0d1021",
+    background: theme.cardBg,
     borderRadius: 16,
     border: "1px solid",
     padding: "1.75rem",
@@ -438,7 +438,7 @@ const styles = {
     colorScheme: "dark"
   },
   option: {
-    background: "#0d1021",
+    background: theme.cardBg,
     color: theme.white
   },
   toggleRow: { position: "relative", display: "flex", gap: 8 },
