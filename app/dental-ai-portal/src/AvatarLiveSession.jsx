@@ -7,10 +7,9 @@ import { theme, fonts } from "./theme.js";
 // case needs a different time budget - these aren't wired to
 // per-case config yet (single-case setup, see AvatarPractice.jsx).
 const TOTAL_SESSION_SECONDS = 300; // 5 min, matching the real exam time
-const START_DELAY_SECONDS = 5;     // grace period before the clock starts
+const START_DELAY_SECONDS = 3;     // grace period after the student clicks Join (on AvatarReady) before the clock starts
 const AMBER_AT_SECONDS = 240;      // 4:00 elapsed (1:00 remaining) - beep + amber
-const RED_AT_SECONDS = 280;        // 4:40 elapsed (0:20 remaining) - solid red
-const FLASH_AT_SECONDS = 290;      // 4:50 elapsed (0:10 remaining) - red + blinking
+const RED_AT_SECONDS = 280;        // 4:40 elapsed (0:20 remaining) - red
 const CLOSING_GRACE_SECONDS = 12;  // time allowed for closing remarks after the clock hits zero
 
 export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
@@ -22,46 +21,37 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   const startDelayTimeoutRef = useRef(null);
   const closingTimeoutRef = useRef(null);
 
-  const clearAllTimersRef = useRef(() => {
-    if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
-    if (startDelayTimeoutRef.current) clearTimeout(startDelayTimeoutRef.current);
-    if (closingTimeoutRef.current) clearTimeout(closingTimeoutRef.current);
-  });
-
-  // "waiting" (not started yet) -> "starting" (5s grace period) ->
-  // "running" (clock ticking) -> "time-up" (closing-remarks window) -> ended
-  const [clockPhase, setClockPhase] = useState("waiting");
+  // "starting" (3s grace period) -> "running" (clock ticking) ->
+  // "time-up" (closing-remarks window) -> ended.
+  //
+  // The student already clicked "Join" on the AvatarReady screen
+  // before this component ever mounted (that's what creates the Tavus
+  // conversation and gives us conversationUrl in the first place), so
+  // the grace period starts on mount rather than waiting on Daily's
+  // own "joined-meeting" event - that event fires at an unpredictable
+  // point depending on Tavus's own internal call UI, and previously
+  // made the clock effectively start right after Start Session rather
+  // than after a deliberate Join action.
+  const [clockPhase, setClockPhase] = useState("starting");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [blinkOn, setBlinkOn] = useState(true);
-  const blinkIntervalRef = useRef(null);
 
   const caseLabel = AVATAR_CASE_CATALOG.find((c) => c.id === caseId)?.label ?? "Selected case";
 
-  const isFlashWindow = clockPhase === "running" && elapsedSeconds >= FLASH_AT_SECONDS;
-
-  // Blinks the pill only during the final 10 seconds (FLASH_AT_SECONDS
-  // to TOTAL_SESSION_SECONDS). A separate, faster interval from the
-  // main 1-second clock tick, since blinking needs a quicker toggle.
   useEffect(() => {
-    if (isFlashWindow && !blinkIntervalRef.current) {
-      blinkIntervalRef.current = setInterval(() => {
-        setBlinkOn((prev) => !prev);
-      }, 450);
-    } else if (!isFlashWindow && blinkIntervalRef.current) {
-      clearInterval(blinkIntervalRef.current);
-      blinkIntervalRef.current = null;
-      setBlinkOn(true);
-    }
-    return () => {
-      if (blinkIntervalRef.current) {
-        clearInterval(blinkIntervalRef.current);
-        blinkIntervalRef.current = null;
-      }
-    };
-  }, [isFlashWindow]);
+    if (!iframeRef.current || !conversationUrl) return;
 
-  function startClockSequence() {
-    setClockPhase("starting");
+    // Load the call the proven way (the iframe's own src loads Tavus's
+    // room directly) - Daily.wrap() is used only to listen for events
+    // on that same iframe, not to drive the join itself.
+    const callFrame = Daily.wrap(iframeRef.current);
+    callFrameRef.current = callFrame;
+
+    function clearAllTimers() {
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+      if (startDelayTimeoutRef.current) clearTimeout(startDelayTimeoutRef.current);
+      if (closingTimeoutRef.current) clearTimeout(closingTimeoutRef.current);
+    }
+
     startDelayTimeoutRef.current = setTimeout(() => {
       setClockPhase("running");
       tickIntervalRef.current = setInterval(() => {
@@ -87,55 +77,19 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
         });
       }, 1000);
     }, START_DELAY_SECONDS * 1000);
-  }
 
-  // TEMPORARY: clock starts immediately when this screen mounts (i.e. as
-  // soon as "Start session" succeeds), instead of waiting for the real
-  // Tavus "joined-meeting" event - so the clock's behavior can be
-  // checked without spending conversation minutes on repeated live
-  // tests. Once confirmed working, delete this effect and uncomment
-  // the startClockSequence() call inside handleJoined below instead.
-  useEffect(() => {
-    console.log("[AvatarLiveSession] component mounted, starting clock sequence"); // TEMP
-    startClockSequence();
-    return () => clearAllTimersRef.current();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!iframeRef.current || !conversationUrl) return;
-
-    const callFrame = Daily.wrap(iframeRef.current);
-    callFrameRef.current = callFrame;
-
-    function handleJoined() {
-      console.log("[AvatarLiveSession] joined-meeting fired"); // TEMP - remove once confirmed working
-      // Once the mount-triggered effect above is removed, restore the
-      // real trigger here:
-      // startClockSequence();
-    }
-
-    function handleLeftOrError(event) {
-      console.log("[AvatarLiveSession] left-meeting or error fired", event); // TEMP
+    function handleLeftOrError() {
       if (hasEndedRef.current) return;
       hasEndedRef.current = true;
-      clearAllTimersRef.current();
+      clearAllTimers();
       onEnd();
     }
 
-    // Listeners attached BEFORE join() is called, not after.
-    callFrame.on("joined-meeting", handleJoined);
     callFrame.on("left-meeting", handleLeftOrError);
     callFrame.on("error", handleLeftOrError);
 
-    console.log("[AvatarLiveSession] calling join()", conversationUrl); // TEMP
-    callFrame.join({ url: conversationUrl }).then(
-      () => console.log("[AvatarLiveSession] join() promise resolved"), // TEMP
-      (err) => console.log("[AvatarLiveSession] join() promise rejected", err) // TEMP
-    );
-
     return () => {
-      callFrame.off("joined-meeting", handleJoined);
+      clearAllTimers();
       callFrame.off("left-meeting", handleLeftOrError);
       callFrame.off("error", handleLeftOrError);
       callFrame.destroy();
@@ -151,7 +105,7 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
   const clockColor =
     elapsedSeconds >= RED_AT_SECONDS ? theme.danger :
     elapsedSeconds >= AMBER_AT_SECONDS ? AMBER_COLOR :
-    theme.ctaMint;
+    theme.lime;
 
   return (
     <div style={styles.wrap}>
@@ -160,15 +114,9 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
           <span style={styles.liveDot} />
           Live · {caseLabel}
         </div>
-        {(clockPhase === "starting" || clockPhase === "running" || clockPhase === "time-up") && (
-          <div style={{
-            ...styles.clockPill,
-            background: `color-mix(in srgb, ${clockColor} 13%, transparent)`,
-            color: clockColor,
-            borderColor: clockColor,
-            opacity: isFlashWindow && !blinkOn ? 0.3 : 1
-          }}>
-            {clockPhase === "starting" ? "Starting…" : clockPhase === "time-up" ? "Time's up" : formatClock(remainingSeconds)}
+        {(clockPhase === "running" || clockPhase === "time-up") && (
+          <div style={{ ...styles.clockPill, background: `${clockColor}22`, color: clockColor, borderColor: clockColor }}>
+            {clockPhase === "time-up" ? "Time's up" : formatClock(remainingSeconds)}
           </div>
         )}
       </div>
@@ -177,6 +125,7 @@ export default function AvatarLiveSession({ caseId, conversationUrl, onEnd }) {
         <iframe
           ref={iframeRef}
           title="AI patient avatar call"
+          src={conversationUrl}
           allow="camera; microphone; autoplay; fullscreen; display-capture"
           style={styles.iframe}
         />
@@ -222,7 +171,7 @@ function playBeep() {
     oscillator.frequency.value = 880; // a simple, gentle tone - not an alarm
     gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
     oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.6);
+    oscillator.stop(ctx.currentTime + 0.3);
     oscillator.onended = () => ctx.close();
   } catch (err) {
     console.error("Could not play timer beep:", err);
