@@ -1,27 +1,34 @@
 import { useState } from "react";
 import { theme, fonts } from "./theme.js";
 
+// Google's 4-color brand palette, used here for the three step tiles
+// (blue / green / red) so each step reads as its own distinct color
+// rather than the previous teal/purple/mint set.
+const GOOGLE_BLUE = "#4285F4";
+const GOOGLE_GREEN = "#34A853";
+const GOOGLE_RED = "#EA4335";
+
 const STEPS = [
   {
     n: "01",
     title: "Choose your case",
     body: "Select an ORE or LDS OSCE station or DTP case based on the topic you want to strengthen.",
     tags: ["Case library", "OSCE & DTP"],
-    accent: theme.tealGlow
+    accent: GOOGLE_BLUE
   },
   {
     n: "02",
     title: "Record your response",
     body: "Answer as you would in the real exam, then upload your recording along with your email.",
     tags: ["Any device", "Under 5 minutes"],
-    accent: theme.purpleGlow
+    accent: GOOGLE_GREEN
   },
   {
     n: "03",
     title: "Get structured feedback",
     body: "Receive an examiner-style scorecard by email — what you got right, what to improve, and how.",
     tags: ["Detailed report"],
-    accent: theme.ctaMint
+    accent: GOOGLE_RED
   }
 ];
 
@@ -62,12 +69,14 @@ function StepCard({ step }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Radial backlight behind the card content, only visible on hover */}
+      {/* Background illumination - each tile's own Google-color glow,
+          visible at rest so the blue/green/red reads immediately, and
+          intensifying on hover rather than only appearing on hover. */}
       <div
         style={{
           ...styles.backlight,
-          background: `radial-gradient(circle at 30% 20%, ${step.accent}33, transparent 65%)`,
-          opacity: hovered ? 1 : 0
+          background: `radial-gradient(circle at 30% 20%, ${step.accent}3d, transparent 68%)`,
+          opacity: hovered ? 1 : 0.65
         }}
       />
 
@@ -75,7 +84,7 @@ function StepCard({ step }) {
         <h3 style={{ ...styles.stepTitle, color: hovered ? step.accent : theme.white }}>
           {step.title}
         </h3>
-        <span style={styles.stepNumber}>{step.n}</span>
+        <span style={{ ...styles.stepNumber, color: step.accent }}>{step.n}</span>
       </div>
 
       <p style={styles.stepBody}>{step.body}</p>

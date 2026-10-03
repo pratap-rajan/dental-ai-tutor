@@ -5,6 +5,12 @@ import { createContext, useContext, useEffect, useState } from "react";
 // purpose - only backgrounds, surfaces, and body text invert. This is
 // what keeps every tile highlight, button fill, and glow effect
 // reading as the same "Plan Ore" brand regardless of light/dark mode.
+//
+// --po-lime was the old yellow accent (#d4e157) - swapped to Google
+// Blue (#4285F4) in both modes, same reasoning as above: kept
+// identical across light/dark so the T&C checkbox fill and "resend"
+// button in Login.jsx (the only consumers of theme.lime) don't flip
+// color when the mode toggles.
 const DARK_VALUES = {
   "--po-navy": "#293039",
   "--po-navy-light": "#333c47",
@@ -24,7 +30,7 @@ const DARK_VALUES = {
   "--po-hero-gradient-end": "#63c9ec",
   "--po-accent-purple": "#a28ff3",
   "--po-cta-mint": "#72d4c4",
-  "--po-lime": "#d4e157",
+  "--po-lime": "#4285f4",
   "--po-card-bg": "#0d1021",
 
   "--po-white": "#ffffff",
@@ -40,10 +46,8 @@ const DARK_VALUES = {
 
 // Neutrals/text/borders use Google's standard Material surface
 // palette (the same grays behind Gmail/Search/Docs). Brand accents
-// (teal, ctaMint, purpleGlow, lime) are left untouched - see note in
-// chat if you want those swapped to Google's 4-color brand palette
-// (#4285F4/#EA4335/#FBBC05/#34A853) too, which would affect dark mode
-// as well since accents stay identical across both modes.
+// (teal, ctaMint, purpleGlow) are left untouched; lime is now also
+// Google Blue (#4285F4), matching DARK_VALUES above.
 const LIGHT_VALUES = {
   "--po-navy": "#ffffff",
   "--po-navy-light": "#f1f3f4",
@@ -63,7 +67,7 @@ const LIGHT_VALUES = {
   "--po-hero-gradient-end": "#63c9ec",
   "--po-accent-purple": "#a28ff3",
   "--po-cta-mint": "#72d4c4",
-  "--po-lime": "#d4e157",
+  "--po-lime": "#4285f4",
   "--po-card-bg": "#ffffff",
 
   "--po-white": "#202124",
@@ -119,4 +123,4 @@ export function ThemeProvider({ children }) {
 
 export function useThemeMode() {
   return useContext(ThemeModeContext);
-}
+} 
