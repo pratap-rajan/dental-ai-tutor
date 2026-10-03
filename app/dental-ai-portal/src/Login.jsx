@@ -406,14 +406,14 @@ const styles = {
   dividerText: { color: "#6b7280", fontSize: 11, whiteSpace: "nowrap" },
   infoBox: { background: theme.navyLighter, border: `1px solid ${theme.navyLighter}`, borderRadius: 8, padding: 12, marginBottom: 14 },
   infoText: { color: theme.slateLight, fontSize: 11.5, lineHeight: 1.5, margin: 0 },
-  tcRow: { display: "flex", alignItems: "flex-start", gap: 9, padding: "10px 12px", background: "#d4e15712", border: "1px solid #d4e15744", borderRadius: 8, marginBottom: 6 },
+  tcRow: { display: "flex", alignItems: "flex-start", gap: 9, padding: "10px 12px", background: "#4285f412", border: "1px solid #4285f444", borderRadius: 8, marginBottom: 6 },
   checkbox: {
     width: 17, height: 17, minWidth: 17, borderRadius: 4, border: "1.5px solid",
     flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center",
     cursor: "pointer", padding: 0, boxSizing: "border-box"
   },
   checkboxTick: { color: "#0d1021", fontSize: 13, fontWeight: 800, lineHeight: 1 },
-  tcText: { color: "#eef2c8", fontSize: 11.5, lineHeight: 1.5, margin: 0 },
+  tcText: { color: theme.white, fontSize: 11.5, lineHeight: 1.5, margin: 0 },
   tcLink: { color: theme.lime, textDecoration: "underline", cursor: "pointer", fontWeight: 500 },
   tcHint: { color: "#6b7280", fontSize: 10.5, margin: "0 0 10px 25px" },
 

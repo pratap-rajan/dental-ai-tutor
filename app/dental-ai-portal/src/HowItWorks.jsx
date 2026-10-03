@@ -1,38 +1,49 @@
 import { useState } from "react";
 import { theme, fonts } from "./theme.js";
+import { useThemeMode } from "./themecontext.jsx";
 
-// Google's 4-color brand palette, used here for the three step tiles
-// (blue / green / red) so each step reads as its own distinct color
-// rather than the previous teal/purple/mint set.
+// Google's 4-color brand palette - used for the three step tiles ONLY
+// in light mode. Dark mode keeps its original teal/purple/mint accent
+// set untouched (see darkAccent below); this is why accent is resolved
+// per-mode inside the component rather than baked into STEP_CONTENT.
 const GOOGLE_BLUE = "#4285F4";
 const GOOGLE_GREEN = "#34A853";
 const GOOGLE_RED = "#EA4335";
 
-const STEPS = [
+const STEP_CONTENT = [
   {
     n: "01",
     title: "Choose your case",
     body: "Select an ORE or LDS OSCE station or DTP case based on the topic you want to strengthen.",
     tags: ["Case library", "OSCE & DTP"],
-    accent: GOOGLE_BLUE
+    darkAccent: theme.tealGlow,
+    lightAccent: GOOGLE_BLUE
   },
   {
     n: "02",
     title: "Record your response",
     body: "Answer as you would in the real exam, then upload your recording along with your email.",
     tags: ["Any device", "Under 5 minutes"],
-    accent: GOOGLE_GREEN
+    darkAccent: theme.purpleGlow,
+    lightAccent: GOOGLE_GREEN
   },
   {
     n: "03",
     title: "Get structured feedback",
     body: "Receive an examiner-style scorecard by email — what you got right, what to improve, and how.",
     tags: ["Detailed report"],
-    accent: GOOGLE_RED
+    darkAccent: theme.ctaMint,
+    lightAccent: GOOGLE_RED
   }
 ];
 
 export default function HowItWorks() {
+  const { mode } = useThemeMode();
+  const steps = STEP_CONTENT.map((s) => ({
+    ...s,
+    accent: mode === "light" ? s.lightAccent : s.darkAccent
+  }));
+
   return (
     <section id="how-it-works" style={styles.section}>
       <div style={styles.inner}>
@@ -44,7 +55,7 @@ export default function HowItWorks() {
         </p>
 
         <div style={styles.stepsGrid}>
-          {STEPS.map((s) => (
+          {steps.map((s) => (
             <StepCard key={s.n} step={s} />
           ))}
         </div>
