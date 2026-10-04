@@ -237,7 +237,16 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
             <div style={styles.toggleRow}>
               <button
                 type="button"
-                style={reportType === "detailed" ? styles.toggleActive : styles.toggle}
+                style={
+                  reportType === "detailed"
+                    ? {
+                        ...styles.toggleActive,
+                        border: `1.5px solid ${selectionAccent}`,
+                        background: `color-mix(in srgb, ${selectionAccent} 10%, transparent)`,
+                        color: selectionAccent
+                      }
+                    : styles.toggle
+                }
                 onClick={() => setReportType("detailed")}
                 disabled={submitting}
               >
@@ -245,7 +254,16 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
               </button>
               <button
                 type="button"
-                style={reportType === "basic" ? styles.toggleActive : styles.toggle}
+                style={
+                  reportType === "basic"
+                    ? {
+                        ...styles.toggleActive,
+                        border: `1.5px solid ${selectionAccent}`,
+                        background: `color-mix(in srgb, ${selectionAccent} 10%, transparent)`,
+                        color: selectionAccent
+                      }
+                    : styles.toggle
+                }
                 onClick={() => setReportType("basic")}
                 disabled={submitting}
               >
