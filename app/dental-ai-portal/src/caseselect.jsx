@@ -7,7 +7,12 @@ import { theme, fonts } from "./theme.js";
  * mobile) becomes genuinely painful. Filters by label as the student
  * types, keyboard-navigable, and closes on selection or outside click.
  */
-export default function CaseSelect({ options, value, onChange, disabled, placeholder = "Select a case" }) {
+export default function CaseSelect({ options, value, onChange, disabled, placeholder = "Select a case", accentColor }) {
+  // accentColor is passed down from UploadForm.jsx — Google Green in
+  // light mode, theme.ctaMint (unchanged) in dark mode. Falls back to
+  // theme.ctaMint if a caller doesn't pass it, so nothing breaks if
+  // CaseSelect is ever used elsewhere without this prop.
+  const resolvedAccent = accentColor || theme.ctaMint;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
@@ -93,7 +98,13 @@ export default function CaseSelect({ options, value, onChange, disabled, placeho
           <ChevronIcon />
         </button>
       ) : (
-        <div style={styles.searchBox}>
+        <div
+          style={{
+            ...styles.searchBox,
+            border: `1.5px solid ${resolvedAccent}`,
+            background: `color-mix(in srgb, ${resolvedAccent} 6%, transparent)`
+          }}
+        >
           <SearchIcon />
           <input
             ref={inputRef}
@@ -116,8 +127,8 @@ export default function CaseSelect({ options, value, onChange, disabled, placeho
                 key={opt.id}
                 style={{
                   ...styles.option,
-                  background: i === highlighted ? "rgba(114,212,196,0.10)" : "transparent",
-                  color: i === highlighted ? theme.ctaMint : theme.white
+                  background: i === highlighted ? `color-mix(in srgb, ${resolvedAccent} 10%, transparent)` : "transparent",
+                  color: i === highlighted ? resolvedAccent : theme.white
                 }}
                 onMouseEnter={() => setHighlighted(i)}
                 onMouseDown={(e) => {
@@ -129,7 +140,7 @@ export default function CaseSelect({ options, value, onChange, disabled, placeho
                 }}
               >
                 {opt.label}
-                {opt.id === value && <CheckIcon />}
+                {opt.id === value && <CheckIcon color={resolvedAccent} />}
               </div>
             ))
           )}
@@ -156,9 +167,9 @@ function SearchIcon() {
   );
 }
 
-function CheckIcon() {
+function CheckIcon({ color }) {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={theme.ctaMint} strokeWidth="2.5">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color || theme.ctaMint} strokeWidth="2.5">
       <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

@@ -21,9 +21,9 @@ export default function Header({ onCtaClick, studentName, onSignOut, onShowRepor
               <button
                 style={{
                   ...styles.reportsButton,
-                  borderColor: reportsHovered ? theme.tealGlow : theme.navyLighter,
-                  color: reportsHovered ? theme.tealGlow : theme.mint,
-                  background: reportsHovered ? "rgba(99,209,230,0.14)" : "transparent",
+                  borderColor: reportsHovered ? theme.tealGlow : `color-mix(in srgb, ${theme.tealGlow} 53%, transparent)`,
+                  color: theme.tealGlow,
+                  background: reportsHovered ? "rgba(99,209,230,0.14)" : "rgba(99,209,230,0.06)",
                   boxShadow: reportsHovered ? `0 0 18px -4px color-mix(in srgb, ${theme.tealGlow} 60%, transparent)` : "none"
                 }}
                 onMouseEnter={() => setReportsHovered(true)}
@@ -105,7 +105,14 @@ const styles = {
     gap: 10
   },
   studentName: {
-    color: theme.mint,
+    // Fixed light color, NOT theme.mint — the header's own background
+    // (rgba(13,14,26,0.85) below) is a hardcoded dark glass bar that
+    // stays dark in both light and dark mode (by design, like a
+    // floating navbar), but theme.mint flips to a dark gray in light
+    // mode, which made the name unreadable against this always-dark
+    // bar. This fixes it in both modes without touching dark mode's
+    // already-correct appearance.
+    color: "#e8eaed",
     fontSize: 13,
     fontWeight: 500,
     whiteSpace: "nowrap",
@@ -125,9 +132,13 @@ const styles = {
     transition: "background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease"
   },
   reportsButton: {
-    border: `1.5px solid ${theme.navyLighter}`,
-    background: "transparent",
-    color: theme.mint,
+    // Base shape now matches signOutButton exactly (border color/
+    // background/text color are supplied per-instance at the JSX call
+    // site, same as signOutButton already does) — this is the "in
+    // sync with Sign out" fix: both buttons now read as one matched
+    // teal-accented pair instead of Reports looking like a plain
+    // gray outline until hovered.
+    border: "1.5px solid",
     fontSize: 12,
     fontWeight: 500,
     padding: "5px 12px",

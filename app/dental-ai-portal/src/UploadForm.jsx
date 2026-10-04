@@ -2,12 +2,22 @@ import { useState, useRef, useEffect } from "react";
 import { CASE_CATALOG, MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, RECAPTCHA_SITE_KEY, STATION_TYPES, DEFAULT_STATION_TYPE } from "./config.js";
 import { requestUploadUrl, uploadFileToS3 } from "./api.js";
 import { theme, fonts } from "./theme.js";
+import { useThemeMode } from "./themecontext.jsx";
 import CaseSelect from "./caseselect.jsx";
 import AvatarPractice from "./AvatarPractice.jsx";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Google Green — light-mode-only replacement for the station-tab
+// selection accent (was theme.ctaMint, too pale against a white card).
+// theme.ctaMint is deliberately identical across light/dark, so this
+// is resolved per-mode in the component below rather than changed in
+// theme.js, to leave dark mode's existing look untouched.
+const GOOGLE_GREEN = "#34A853";
+
 export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
+  const { mode } = useThemeMode();
+  const selectionAccent = mode === "light" ? GOOGLE_GREEN : theme.ctaMint;
   const [stationType, setStationType] = useState(DEFAULT_STATION_TYPE);
   const [caseId, setCaseId] = useState("");
   const [email, setEmail] = useState(studentEmail || "");
@@ -173,7 +183,14 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
                   type="button"
                   style={{
                     ...styles.stationTab,
-                    ...(active ? styles.stationTabActive : {}),
+                    ...(active
+                      ? {
+                          background: `color-mix(in srgb, ${selectionAccent} 10%, transparent)`,
+                          border: `1.5px solid ${selectionAccent}`,
+                          color: selectionAccent,
+                          boxShadow: `0 0 20px -6px color-mix(in srgb, ${selectionAccent} 60%, transparent)`
+                        }
+                      : {}),
                     ...(!type.enabled ? styles.stationTabDisabled : {})
                   }}
                   onClick={() => handleStationTypeChange(type.id)}
@@ -198,6 +215,7 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
               value={caseId}
               onChange={setCaseId}
               disabled={submitting}
+              accentColor={selectionAccent}
             />
           </div>
 
