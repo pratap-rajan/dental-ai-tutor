@@ -47,6 +47,16 @@ KNOWLEDGE_BASE_MAX_RESULTS = int(os.environ.get("KNOWLEDGE_BASE_MAX_RESULTS", "5
 MAX_SCR_RECORDING_SECONDS = int(os.environ.get("MAX_SCR_RECORDING_SECONDS", "720"))  # 12 min
 SCR_IDEAL_MAX_SECONDS     = int(os.environ.get("SCR_IDEAL_MAX_SECONDS", "600"))       # 10 min
 
+# Global grading rules — ONE file, outside cases/{caseId}/ entirely, so
+# it never touches any of the 130+ per-case uploads. Cross-cutting
+# tutor/student-feedback-driven tweaks (e.g. "always use generic drug
+# names, not brand names") go here instead of being copy-pasted into
+# every case's prompt-template.txt. Applies to every assessment_type
+# (OSCE and SCR) and every submission path (direct upload AND
+# avatar-recovered transcripts), since both funnel through this same
+# lambda_handler. Missing file = no-op (existing behavior unchanged).
+GLOBAL_RULES_KEY = os.environ.get("GLOBAL_RULES_KEY", "global-grading-rules.txt")
+
 
 def get_s3_key_from_event(event):
     try:
@@ -962,6 +972,21 @@ def lambda_handler(event, context):
         print(f"Reading prompt template: {prompt_key}")
         prompt_template = read_s3_text(BUCKET_NAME, prompt_key)
         print("✓ prompt template loaded")
+
+        # Global grading rules — prepended ahead of the case-specific
+        # template so they read as foundational policy before any case
+        # content. Plain string concat, not a {global_rules} placeholder:
+        # per-case prompt-template.txt files never need to reference or
+        # even know this exists. NOTE: if a future global rule needs to
+        # show literal JSON/braces as an example, escape them as {{ }}
+        # same as the per-case templates do — the combined string still
+        # goes through prompt_template.format() below via build_prompt().
+        global_rules = try_read_s3_text(BUCKET_NAME, GLOBAL_RULES_KEY)
+        if global_rules and global_rules.strip():
+            print(f"✓ global grading rules loaded from {GLOBAL_RULES_KEY}")
+            prompt_template = global_rules.strip() + "\n\n" + prompt_template
+        else:
+            print(f"No global grading rules file found at {GLOBAL_RULES_KEY} — proceeding without it")
 
         reference_answer = extract_transcript(reference_json)
         student_answer, duration_seconds = extract_transcript_and_duration(student_json)
