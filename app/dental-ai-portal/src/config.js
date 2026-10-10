@@ -16,16 +16,7 @@ export const API_BASE_URL = "https://rc98xaw0tg.execute-api.eu-west-2.amazonaws.
 export const STATION_TYPES = [
   { id: "OSCE", label: "OSCE", enabled: true },
   { id: "DTP", label: "DTP", enabled: false },
-  { id: "SCR", label: "SCR", enabled: true },
-  { id: "AVATAR", label: "AI Avatar", enabled: true }
-];
-
-// Case catalog for the AI Avatar practice tab (admin-only). Kept
-// separate from CASE_CATALOG above since this isn't wired into the
-// OSCE/SCR/DTP recording pipeline. No persona/face picker — each
-// case's PAL uses its own default face.
-export const AVATAR_CASE_CATALOG = [
-  { id: "case3-avulsed-tooth", label: "Case 3 — Avulsed tooth (telephone triage)" }
+  { id: "SCR", label: "SCR", enabled: true }
 ];
 
 export const DEFAULT_STATION_TYPE = "OSCE";
@@ -473,6 +464,21 @@ export const CASE_CATALOG = [
   {
     id: "case87-papilloma-on-roof",
     label: "Case 87 — Papilloma on roof of the mouth",
+    stationType: "OSCE"
+  },
+  {
+    id: "case88-necro-ulcer-gingivitis",
+    label: "Case 88 — Necrotising ulcerative gingivitis",
+    stationType: "OSCE"
+  },
+  {
+    id: "case89-perforation-rct",
+    label: "Case 89 — Perforation during RCT",
+    stationType: "OSCE"
+  },
+  {
+    id: "case90-bitewing",
+    label: "Case 90 — Necessity of taking a bitewing",
     stationType: "OSCE"
   },
   {
