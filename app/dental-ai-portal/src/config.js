@@ -1,6 +1,7 @@
 // -----------------------------------------------------------------------
 // EDIT THESE VALUES FOR YOUR DEPLOYMENT
 // -----------------------------------------------------------------------
+
 // The API Gateway endpoint that fronts your presigned-URL Lambda.
 // Deployed to the $default stage, so there is no /prod suffix.
 export const API_BASE_URL = "https://rc98xaw0tg.execute-api.eu-west-2.amazonaws.com";
@@ -15,7 +16,16 @@ export const API_BASE_URL = "https://rc98xaw0tg.execute-api.eu-west-2.amazonaws.
 export const STATION_TYPES = [
   { id: "OSCE", label: "OSCE", enabled: true },
   { id: "DTP", label: "DTP", enabled: false },
-  { id: "SCR", label: "SCR", enabled: true }
+  { id: "SCR", label: "SCR", enabled: true },
+  { id: "AVATAR", label: "AI Avatar", enabled: true }
+];
+
+// Case catalog for the AI Avatar practice tab (admin-only). Kept
+// separate from CASE_CATALOG above since this isn't wired into the
+// OSCE/SCR/DTP recording pipeline. No persona/face picker — each
+// case's PAL uses its own default face.
+export const AVATAR_CASE_CATALOG = [
+  { id: "case3-avulsed-tooth", label: "Case 3 — Avulsed tooth (telephone triage)" }
 ];
 
 export const DEFAULT_STATION_TYPE = "OSCE";
