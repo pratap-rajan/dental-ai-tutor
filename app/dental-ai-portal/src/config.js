@@ -1,7 +1,6 @@
 // -----------------------------------------------------------------------
 // EDIT THESE VALUES FOR YOUR DEPLOYMENT
 // -----------------------------------------------------------------------
-
 // The API Gateway endpoint that fronts your presigned-URL Lambda.
 // Deployed to the $default stage, so there is no /prod suffix.
 export const API_BASE_URL = "https://rc98xaw0tg.execute-api.eu-west-2.amazonaws.com";
