@@ -482,6 +482,26 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case91-facial-swelling",
+    label: "Case 91 — Mandibular facial swelling",
+    stationType: "OSCE"
+  },
+  {
+    id: "case92-appraisal",
+    label: "Case 92 — Appraisal",
+    stationType: "OSCE"
+  },
+  {
+    id: "case93-antibiotic-stewardship",
+    label: "Case 93 — Antibiotic stewardship",
+    stationType: "OSCE"
+  },
+  {
+    id: "case94-worried-hiv",
+    label: "Case 94 — Patient worried about HIV",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
