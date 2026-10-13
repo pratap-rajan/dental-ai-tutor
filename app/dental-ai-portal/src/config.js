@@ -511,6 +511,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case95-medicolegal",
+    label: "Case 95 — Medicolegal concerns and duty of candour (nerve injury)",
+    stationType: "OSCE"
+  },
+  {
+    id: "case96-denture-care",
+    label: "Case 96 — Denture care advice for a care worker",
+    stationType: "OSCE"
+  },
+  {
+    id: "case97-ozempic",
+    label: "Case 97 — “Ozempic teeth”: GLP-1 medication and oral health",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
