@@ -526,6 +526,21 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case98-poor-hygiene",
+    label: "Case 98 — Orthodontic referral with poor oral hygiene",
+    stationType: "OSCE"
+  },
+  {
+    id: "case99-professional-boundary",
+    label: "Case 99 — Colleague who crossed a professional boundary",
+    stationType: "OSCE"
+  },
+  {
+    id: "case100-steroids-patient",
+    label: "Case 100 — Extraction in a patient taking steroids",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
