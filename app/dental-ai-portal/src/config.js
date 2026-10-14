@@ -541,6 +541,41 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case101-enamel-dentine-8yrs-old",
+    label: "Case 101 — Enamel–dentine fracture in an 8-year-old",
+    stationType: "OSCE"
+  },
+  {
+    id: "case102-pyogenic",
+    label: "Case 102 — Pyogenic granuloma in a pregnant patient",
+    stationType: "OSCE"
+  },
+  {
+    id: "case103-failed-rct",
+    label: "Case 103 — Failed root canal treatment",
+    stationType: "OSCE"
+  },
+  {
+    id: "case104-endo-perio-lesion",
+    label: "Case 104 — Endo–perio lesion",
+    stationType: "OSCE"
+  },
+  {
+    id: "case105-loose-partial-denture",
+    label: "Case 105 — Loose partial denture: managing expectations",
+    stationType: "OSCE"
+  },
+  {
+    id: "case106-15yrs-rct",
+    label: "Case 106 — Confidentiality and consent: 15-year-old needing root canal treatment",
+    stationType: "OSCE"
+  },
+  {
+    id: "case107-breach-confidentiality",
+    label: "Case 107 — Breach of confidentiality: elderly patient and her daughter",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
