@@ -576,6 +576,16 @@ export const CASE_CATALOG = [
     stationType: "OSCE"
   },
   {
+    id: "case108-under-performing-associate",
+    label: "Case 108 — Advising a principal dentist on an underperforming associate",
+    stationType: "OSCE"
+  },
+  {
+    id: "case109-grievance-procedure",
+    label: "Case 109 — Grievance procedure",
+    stationType: "OSCE"
+  },
+  {
     id: "case1-scr-dental-trauma",
     label: "Case 1 — Dental trauma",
     stationType: "SCR"
