@@ -15,7 +15,7 @@ export const API_BASE_URL = "https://rc98xaw0tg.execute-api.eu-west-2.amazonaws.
 // check will plug into, so no rebuild is needed when that lands.
 export const STATION_TYPES = [
   { id: "OSCE", label: "OSCE", enabled: true },
-  { id: "DTP", label: "DTP", enabled: false },
+  { id: "DTP", label: "DTP", enabled: true },
   { id: "SCR", label: "SCR", enabled: true },
   { id: "AVATAR", label: "AI Avatar", enabled: true }
 ];
@@ -584,6 +584,17 @@ export const CASE_CATALOG = [
     id: "case109-grievance-procedure",
     label: "Case 109 — Grievance procedure",
     stationType: "OSCE"
+  },
+  // DTP cases: one catalog entry per station, with two recordings.
+  // Each part id is its own S3 case folder (cases/{part.id}/...).
+  {
+    id: "dtp-case1-bleeding-gums",
+    label: "DTP Case 1 — Bleeding gums",
+    stationType: "DTP",
+    parts: [
+      { id: "case1a-dtp-bleeding-gums-history", label: "1A — History taking" },
+      { id: "case1b-dtp-bleeding-gums-plan", label: "1B — Diagnosis & treatment plan" }
+    ]
   },
   {
     id: "case1-scr-dental-trauma",

@@ -5,6 +5,7 @@ import { theme, fonts } from "./theme.js";
 import { useThemeMode } from "./themecontext.jsx";
 import CaseSelect from "./caseselect.jsx";
 import AvatarPractice from "./AvatarPractice.jsx";
+import DtpUploadBlocks from "./DtpUploadBlocks.jsx";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -91,6 +92,18 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
 
   const filteredCases = CASE_CATALOG.filter((c) => c.stationType === stationType);
 
+  // DTP cases carry a `parts` array (history recording + plan recording).
+  // Each part is its own case in S3 (cases/{part.id}/...), uploaded from
+  // its own block, so the backend pipeline is unchanged.
+  const selectedCase = CASE_CATALOG.find((c) => c.id === caseId);
+  const isMultiPart = Array.isArray(selectedCase?.parts) && selectedCase.parts.length > 0;
+
+  function validateCommon() {
+    if (!caseId) return "Select a case to continue.";
+    if (!email || !EMAIL_PATTERN.test(email)) return "Enter a valid email address.";
+    return "";
+  }
+
   function handleDrop(e) {
     e.preventDefault();
     setDragActive(false);
@@ -100,6 +113,8 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    // Multi-part (DTP) cases upload from their own blocks, not the form.
+    if (isMultiPart) return;
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -272,6 +287,20 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
             </div>
           </div>
 
+          {isMultiPart ? (
+            <DtpUploadBlocks
+              parts={selectedCase.parts}
+              groupLabel={selectedCase.label}
+              email={email}
+              reportType={reportType}
+              validateCommon={validateCommon}
+              getCaptchaToken={getCaptchaToken}
+              onAllSubmitted={onSubmitted}
+              disabled={submitting}
+              accentColor={selectionAccent}
+            />
+          ) : (
+          <>
           <div
             style={{
               ...styles.dropzone,
@@ -328,6 +357,8 @@ export default function UploadForm({ onSubmitted, formRef, studentEmail }) {
               "Submit for feedback"
             )}
           </button>
+          </>
+          )}
 
           {RECAPTCHA_SITE_KEY && (
             <p style={styles.captchaNotice}>
