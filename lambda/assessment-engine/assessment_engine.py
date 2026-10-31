@@ -4,6 +4,7 @@ import base64
 import io
 import datetime
 import urllib.parse
+import re
 import boto3
 from boto3.dynamodb.conditions import Key as DynamoKey
 from reportlab.lib.pagesizes import A4
@@ -321,7 +322,105 @@ Return ONLY valid JSON in this exact shape, nothing else:
     }
 
 
-def generate_rejection_report(case_id, reason):
+# ============================================================
+# DTP two-part cases — wrong-recording guard
+# A DTP station is two separate cases in S3:
+#   case<N>a-dtp-<slug>-history  (part A: history taking)
+#   case<N>b-dtp-<slug>-plan     (part B: diagnosis & treatment plan)
+# Both parts are about the same patient, so the generic relevance check
+# can't tell them apart. This guard classifies the recording type and
+# rejects a history recording uploaded to part B (or vice versa) with a
+# message telling the student which block to use instead.
+# Non-DTP case ids are untouched (dtp_part_info returns None).
+# ============================================================
+
+_DTP_ID = re.compile(r"^case(\d+)([ab])-dtp-.+-(history|plan)$", re.IGNORECASE)
+
+DTP_PART_LABELS = {
+    "history": "history-taking",
+    "plan": "diagnosis & treatment-plan",
+}
+
+
+def dtp_part_info(case_id):
+    """
+    Returns {"number": "1", "letter": "A", "kind": "history",
+             "other_letter": "B", "other_kind": "plan"} for a DTP part
+    case id, or None for any other case.
+    """
+    m = _DTP_ID.match(case_id or "")
+    if not m:
+        return None
+    number, letter, kind = m.group(1), m.group(2).upper(), m.group(3).lower()
+    other_kind = "plan" if kind == "history" else "history"
+    other_letter = "B" if letter == "A" else "A"
+    return {"number": number, "letter": letter, "kind": kind,
+            "other_letter": other_letter, "other_kind": other_kind}
+
+
+def check_dtp_recording_type(student_answer):
+    """
+    Classifies a DTP recording as history taking or a diagnosis /
+    treatment-plan presentation. Returns {"type": "history"|"plan"|"unclear",
+    "reason": str}. Fails open ("unclear") on any error, so a classifier
+    problem never blocks a genuine submission.
+    """
+    check_prompt = f"""You are classifying a dental student's recorded
+exam answer from a Diagnosis and Treatment Planning (DTP) station. Do not
+score it. Decide which of these two recording types it is:
+
+- "history": the student is TAKING A HISTORY — mostly asking the patient
+  questions (presenting complaint, medical, dental and social history,
+  constraints, expectations). Patient answers may or may not be present.
+- "plan": the student is PRESENTING to an examiner — mostly stating a
+  diagnosis, investigations, radiographs, findings and a treatment plan.
+
+If it is a genuine mix or you cannot tell, answer "unclear".
+
+STUDENT'S RECORDING (transcribed)
+{student_answer}
+
+Return ONLY valid JSON in this exact shape, nothing else:
+{{
+  "type": "history" or "plan" or "unclear",
+  "reason": "one short sentence explaining the decision"
+}}
+"""
+    try:
+        result = json.loads(clean_json_response(invoke_claude(check_prompt)))
+        rec_type = str(result.get("type", "unclear")).lower().strip()
+        if rec_type not in ("history", "plan"):
+            rec_type = "unclear"
+        return {"type": rec_type, "reason": result.get("reason", "")}
+    except Exception as ex:
+        print(f"WARNING: DTP recording-type check failed, proceeding without it: {ex}")
+        return {"type": "unclear", "reason": ""}
+
+
+def dtp_wrong_part_message(info):
+    """Student-facing explanation for a DTP recording uploaded to the wrong block."""
+    n = info["number"]
+    return (
+        f"This looks like your {DTP_PART_LABELS[info['other_kind']]} recording, "
+        f"but it was uploaded to block {n}{info['letter']} "
+        f"({DTP_PART_LABELS[info['kind']]}). Please re-submit it in block "
+        f"{n}{info['other_letter']} ({DTP_PART_LABELS[info['other_kind']]}) for "
+        f"DTP Case {n}, and upload your {DTP_PART_LABELS[info['kind']]} recording "
+        f"in block {n}{info['letter']}."
+    )
+
+
+def generate_rejection_report(case_id, reason, guidance=None):
+    """
+    guidance — optional override for the "what to do next" paragraph
+    (used by the DTP wrong-part guard). None keeps the original wording.
+    """
+    next_step = guidance or (
+        "This usually happens when a recording is uploaded to the "
+        "wrong case. Please check which case this recording was "
+        "actually intended for and re-submit it under the correct "
+        "case selection."
+    )
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -350,12 +449,7 @@ def generate_rejection_report(case_id, reason):
             clinical scenario for this case.
         </p>
         <div class="reason">{reason}</div>
-        <p>
-            This usually happens when a recording is uploaded to the
-            wrong case. Please check which case this recording was
-            actually intended for and re-submit it under the correct
-            case selection.
-        </p>
+        <p>{next_step}</p>
         <p>No score has been generated for this attempt.</p>
     </div>
 </body>
@@ -1028,6 +1122,38 @@ def lambda_handler(event, context):
                 f"closer to this target."
             )
             print(f"NOTE: duration {duration_seconds:.0f}s exceeds ideal {SCR_IDEAL_MAX_SECONDS}s — flagging in report, not rejecting")
+
+        #
+        # DTP wrong-part gate — only for DTP part case ids
+        # (case<N>a-dtp-...-history / case<N>b-dtp-...-plan)
+        #
+        dtp_info = dtp_part_info(case_id)
+        if dtp_info:
+            print(f"DTP case detected: part {dtp_info['number']}{dtp_info['letter']} ({dtp_info['kind']}) — checking recording type...")
+            rec = check_dtp_recording_type(student_answer)
+            print(f"DTP recording-type check result: {rec}")
+
+            if rec["type"] == dtp_info["other_kind"]:
+                guidance = dtp_wrong_part_message(dtp_info)
+                print(f"REJECTED — DTP wrong part: {guidance}")
+
+                report_key = f"reports/{case_id}/{file_prefix}-report.html"
+                html_report = generate_rejection_report(case_id, rec["reason"] or guidance, guidance=guidance)
+                write_s3_html(BUCKET_NAME, report_key, html_report)
+
+                send_rejection_email(case_id, file_prefix, guidance, email_id)
+
+                return {
+                    "statusCode": 200,
+                    "body": {
+                        "message":       "Rejected — DTP recording uploaded to the wrong part",
+                        "caseId":        case_id,
+                        "student":       file_prefix,
+                        "report_s3_key": report_key,
+                        "email_sent_to": email_id,
+                        "rejectionReason": guidance
+                    }
+                }
 
         #
         # Relevance gate
